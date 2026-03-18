@@ -41,7 +41,7 @@ Output: `dist\ProfileGenerator.exe` (single file, no Python required on target).
 ## Project Structure
 
 ```
-ProfileGenerator/
+ElectrodeGenerator/
 ├── src/
 │   ├── gui.py              — GUI application (Tkinter + matplotlib)
 │   ├── main.py             — CLI entry point
@@ -54,9 +54,10 @@ ProfileGenerator/
 ├── docs/
 │   └── implementation_plan.md
 ├── build.bat               — PyInstaller build script
+├── pyproject.toml          — Project metadata & packaging
 ├── requirements.txt        — Python dependencies
 ├── README.md
-└── LICENSE.txt
+└── LICENSE
 ```
 
 ## Profile Equations
