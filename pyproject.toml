@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "electrode-profile-generator"
+version = "1.2.0"
+description = "Interactive tool for generating and visualizing electrode profiles (Rogowski, Chang, Ernst) for parallel plate electrode design."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.9"
+authors = [
+    { name = "Pau Bas Calopa" },
+]
+keywords = ["electrode", "profile", "rogowski", "chang", "ernst", "dxf", "cad"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering",
+]
+dependencies = [
+    "numpy>=1.21.0",
+    "matplotlib>=3.5.0",
+    "ezdxf>=1.1.0",
+]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.0.0"]
+
+[project.urls]
+Repository = "https://github.com/PauBasCalopa/ElectrodeGenerator"
+
+[project.gui-scripts]
+electrode-generator = "src.gui:main"
+
+[project.scripts]
+electrode-generator-cli = "src.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
