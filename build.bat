@@ -1,15 +1,24 @@
 @echo off
 REM ============================================================
 REM  Build distributable exe using PyInstaller (single file)
-REM  Requires: pip install pyinstaller
+REM  Requires: .venv with dependencies installed
 REM ============================================================
 
 echo ============================================================
 echo  Building Electrode Profile Generator
 echo ============================================================
 
-REM Install PyInstaller if missing
-pip install pyinstaller --quiet
+REM Create venv if it doesn't exist
+if not exist ".venv" (
+    echo Creating virtual environment...
+    python -m venv .venv
+)
+
+REM Activate venv
+call .venv\Scripts\activate.bat
+
+REM Install/update dependencies
+pip install -r requirements.txt --quiet
 
 REM Clean previous build artifacts
 if exist "build" rmdir /s /q "build"
@@ -20,10 +29,12 @@ REM Build single-file exe
 pyinstaller --onefile --windowed ^
     --name "ProfileGenerator" ^
     --icon "assets\icon.png" ^
-    --add-data "src\version.py;." ^
-    --add-data "src\profiles.py;." ^
-    --add-data "src\dxf_exporter.py;." ^
-    --add-data "src\InputValidator.py;." ^
+    --paths "src" ^
+    --hidden-import "ezdxf" ^
+    --hidden-import "profiles" ^
+    --hidden-import "dxf_exporter" ^
+    --hidden-import "InputValidator" ^
+    --hidden-import "version" ^
     --add-data "assets;assets" ^
     src\gui.py
 

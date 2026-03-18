@@ -38,6 +38,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.egg-info/
+.venv/
 *.egg
 .eggs/
 *.whl
