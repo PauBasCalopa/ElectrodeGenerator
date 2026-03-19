@@ -33,6 +33,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+simulation = ["pyfemm>=0.1.0"]
 build = ["pyinstaller>=6.0.0"]
 
 [project.urls]
