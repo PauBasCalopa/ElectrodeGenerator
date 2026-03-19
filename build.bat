@@ -35,8 +35,10 @@ pyinstaller --onefile --windowed ^
     --hidden-import "dxf_exporter" ^
     --hidden-import "InputValidator" ^
     --hidden-import "version" ^
+    --hidden-import "gui" ^
+    --hidden-import "femm_exporter" ^
     --add-data "assets;assets" ^
-    src\gui.py
+    src\main.py
 
 echo.
 
