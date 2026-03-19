@@ -138,7 +138,7 @@ class ProfileGeneratorGUI:
         tk.Label(self.left, text="Export", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W)
         tk.Button(self.left, text="Export CSV", command=self._export_csv, width=22).pack(pady=2)
         tk.Button(self.left, text="Export PNG", command=self._export_png, width=22).pack(pady=2)
-        tk.Button(self.left, text="Export DXF", command=self._export_dxf, width=22).pack(pady=2)
+        tk.Button(self.left, text="Export DXF\u2026", command=self._show_dxf_wizard, width=22).pack(pady=2)
         tk.Button(self.left, text="Export FEMM Lua\u2026", command=self._show_femm_wizard, width=22).pack(pady=2)
 
         # Status bar
@@ -373,21 +373,72 @@ class ProfileGeneratorGUI:
         except Exception as e:
             self.status_var.set(f"PNG export failed: {e}")
 
-    def _export_dxf(self):
+    def _show_dxf_wizard(self):
+        """Open a dialog to configure DXF export parameters, then export."""
+        wiz = tk.Toplevel(self.root)
+        wiz.title("DXF Export")
+        wiz.resizable(False, False)
+        wiz.transient(self.root)
+        wiz.grab_set()
+
+        dxf_ver = tk.StringVar(value="R2000")
+        curve_type = tk.StringVar(value="Spline")
+        single_layer = tk.BooleanVar(value=False)
+
+        r = 0
+        tk.Label(wiz, text="DXF version:").grid(row=r, column=0, sticky=tk.W, padx=8, pady=4)
+        ttk.Combobox(wiz, textvariable=dxf_ver,
+                     values=["R2000", "R2004", "R2007", "R2010", "R2013", "R2018"],
+                     state="readonly", width=18
+                     ).grid(row=r, column=1, padx=8, pady=4)
+
+        r += 1
+        tk.Label(wiz, text="Curve entity type:").grid(row=r, column=0, sticky=tk.W, padx=8, pady=4)
+        ttk.Combobox(wiz, textvariable=curve_type,
+                     values=["Spline", "Polyline"],
+                     state="readonly", width=18
+                     ).grid(row=r, column=1, padx=8, pady=4)
+
+        r += 1
+        tk.Checkbutton(wiz, text="Merge all curves into one layer",
+                       variable=single_layer).grid(
+            row=r, column=0, columnspan=2, sticky=tk.W, padx=8, pady=4)
+
+        r += 1
+        def _do_export():
+            dxf_config = {
+                "dxf_version": dxf_ver.get(),
+                "curve_type": curve_type.get(),
+                "single_layer": single_layer.get(),
+            }
+            wiz.destroy()
+            self._export_dxf(dxf_config)
+
+        tk.Button(wiz, text="Export DXF", command=_do_export,
+                  width=22).grid(row=r, column=0, columnspan=2, pady=12)
+
+    def _export_dxf(self, dxf_config):
         path = filedialog.asksaveasfilename(defaultextension=".dxf",
                                             initialfile=self._default_filename(".dxf"),
                                             filetypes=[("DXF files", "*.dxf")])
         if not path:
             return
         try:
+            version = dxf_config.get("dxf_version", "R2000")
+            use_spline = dxf_config.get("curve_type", "Spline") == "Spline"
+            single = dxf_config.get("single_layer", False)
+
             exporter = DXFExporter()
-            exporter.create_new_document(dxfversion='R2000')
+            exporter.create_new_document(dxfversion=version)
             for cx, cy, label in self._curves:
                 points = list(zip(cx.tolist(), cy.tolist()))
-                layer = label.upper().replace(" ", "_").replace("-", "_")
-                is_plate = "PLATE" in layer
-                color = 7 if is_plate else 5  # white for plates, blue for curves
-                if is_plate:
+                if single:
+                    layer = "PROFILE"
+                else:
+                    layer = label.upper().replace(" ", "_").replace("-", "_")
+                is_plate = "Plate" in label
+                color = 7 if is_plate else 5
+                if is_plate or not use_spline:
                     exporter.add_polyline(points, layer, color)
                 else:
                     exporter.add_spline(points, layer, color)
