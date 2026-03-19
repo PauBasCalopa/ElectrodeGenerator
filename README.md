@@ -6,7 +6,7 @@ The tool provides a real-time interactive GUI, full electrode assembly visualiza
 
 ## Screenshots
 
-| Profile editor | Electrode assembly | FEMM simulation |
+| Profile editor | FEMM simulation | Electric field plot |
 |:-:|:-:|:-:|
 | ![Profile editor](assets/Captura.JPG) | ![Electrode assembly](assets/Captura2.JPG) | ![FEMM simulation](assets/Captura3.JPG) |
 
