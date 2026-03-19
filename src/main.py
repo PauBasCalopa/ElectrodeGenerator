@@ -13,8 +13,8 @@ import argparse
 from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
-from profiles import PROFILES, ProfileBase
-from dxf_exporter import DXFExporter
+from core.profiles import PROFILES, ProfileBase
+from exporters.dxf_exporter import DXFExporter
 
 
 def get_user_input(profile: ProfileBase) -> dict:

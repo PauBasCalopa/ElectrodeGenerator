@@ -1,7 +1,7 @@
 """Application metadata — edit here, consumed by the GUI About dialog and build script."""
 
 APP_NAME = "Electrode Profile Generator"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 APP_AUTHOR = "Pau Bas Calopa"
 APP_DESCRIPTION = (
     "Interactive tool for generating and visualizing electrode profiles "
