@@ -36,6 +36,7 @@ pyinstaller --onefile --windowed ^
     --hidden-import "InputValidator" ^
     --hidden-import "version" ^
     --hidden-import "gui" ^
+    --hidden-import "femm_exporter" ^
     --add-data "assets;assets" ^
     src\main.py
 

@@ -139,6 +139,7 @@ class ProfileGeneratorGUI:
         tk.Button(self.left, text="Export CSV", command=self._export_csv, width=22).pack(pady=2)
         tk.Button(self.left, text="Export PNG", command=self._export_png, width=22).pack(pady=2)
         tk.Button(self.left, text="Export DXF", command=self._export_dxf, width=22).pack(pady=2)
+        tk.Button(self.left, text="Export FEMM Lua\u2026", command=self._show_femm_wizard, width=22).pack(pady=2)
 
         # Status bar
         self.status_var = tk.StringVar(value="Ready")
@@ -394,6 +395,149 @@ class ProfileGeneratorGUI:
             self.status_var.set(f"Exported DXF: {path}")
         except Exception as e:
             self.status_var.set(f"DXF export failed: {e}")
+
+    # ------------------------------------------------------------------
+    # FEMM export
+    # ------------------------------------------------------------------
+    def _build_assembly_curves(self, is_axi=False):
+        """Build electrode assembly curves (always full assembly, independent of checkbox)."""
+        config = self._current_config()
+        x, y = self.profile.generate_points(config)
+
+        gap = self.gap.get()
+        d = self.plate_length.get()
+
+        x0, y0 = x[0], y[0]
+        xn = (x - x0).tolist()
+        yn = (y - y0).tolist()
+
+        curves = []
+        # Top electrode
+        curves.append(([xi + d / 2 for xi in xn], [yi + gap / 2 for yi in yn], "Top-Right"))
+        if is_axi:
+            curves.append(([0, d / 2], [gap / 2, gap / 2], "Top Plate"))
+        else:
+            curves.append(([-xi - d / 2 for xi in xn], [yi + gap / 2 for yi in yn], "Top-Left"))
+            curves.append(([-d / 2, d / 2], [gap / 2, gap / 2], "Top Plate"))
+
+        # Bottom electrode
+        curves.append(([xi + d / 2 for xi in xn], [-yi - gap / 2 for yi in yn], "Bot-Right"))
+        if is_axi:
+            curves.append(([0, d / 2], [-gap / 2, -gap / 2], "Bot Plate"))
+        else:
+            curves.append(([-xi - d / 2 for xi in xn], [-yi - gap / 2 for yi in yn], "Bot-Left"))
+            curves.append(([-d / 2, d / 2], [-gap / 2, -gap / 2], "Bot Plate"))
+
+        return curves
+
+    def _show_femm_wizard(self):
+        """Open a dialog to configure FEMM simulation parameters, then export."""
+        wiz = tk.Toplevel(self.root)
+        wiz.title("FEMM Export")
+        wiz.resizable(False, False)
+        wiz.transient(self.root)
+        wiz.grab_set()
+
+        prob_type = tk.StringVar(value="planar")
+        units = tk.StringVar(value="millimeters")
+        depth_var = tk.DoubleVar(value=1.0)
+        v_top = tk.DoubleVar(value=1000.0)
+        v_bot = tk.DoubleVar(value=0.0)
+        eps_r = tk.DoubleVar(value=1.0)
+        mesh_var = tk.DoubleVar(value=0.0)
+        auto_solve = tk.BooleanVar(value=False)
+
+        r = 0
+        tk.Label(wiz, text="Problem type:").grid(row=r, column=0, sticky=tk.W, padx=8, pady=4)
+        ttk.Combobox(wiz, textvariable=prob_type,
+                     values=["planar", "axi"], state="readonly", width=18
+                     ).grid(row=r, column=1, padx=8, pady=4)
+
+        r += 1
+        tk.Label(wiz, text="Units:").grid(row=r, column=0, sticky=tk.W, padx=8, pady=4)
+        ttk.Combobox(wiz, textvariable=units,
+                     values=["millimeters", "centimeters", "meters",
+                             "inches", "mils", "micrometers"],
+                     state="readonly", width=18
+                     ).grid(row=r, column=1, padx=8, pady=4)
+
+        r += 1
+        tk.Label(wiz, text="Depth (planar):").grid(row=r, column=0, sticky=tk.W, padx=8, pady=4)
+        tk.Entry(wiz, textvariable=depth_var, width=20).grid(row=r, column=1, padx=8, pady=4)
+
+        r += 1
+        ttk.Separator(wiz, orient=tk.HORIZONTAL).grid(
+            row=r, column=0, columnspan=2, sticky=tk.EW, padx=8, pady=4)
+
+        r += 1
+        tk.Label(wiz, text="Top electrode voltage (V):").grid(row=r, column=0, sticky=tk.W, padx=8, pady=4)
+        tk.Entry(wiz, textvariable=v_top, width=20).grid(row=r, column=1, padx=8, pady=4)
+
+        r += 1
+        tk.Label(wiz, text="Bottom electrode voltage (V):").grid(row=r, column=0, sticky=tk.W, padx=8, pady=4)
+        tk.Entry(wiz, textvariable=v_bot, width=20).grid(row=r, column=1, padx=8, pady=4)
+
+        r += 1
+        tk.Label(wiz, text="Relative permittivity (\u03b5r):").grid(row=r, column=0, sticky=tk.W, padx=8, pady=4)
+        tk.Entry(wiz, textvariable=eps_r, width=20).grid(row=r, column=1, padx=8, pady=4)
+
+        r += 1
+        ttk.Separator(wiz, orient=tk.HORIZONTAL).grid(
+            row=r, column=0, columnspan=2, sticky=tk.EW, padx=8, pady=4)
+
+        r += 1
+        tk.Label(wiz, text="Mesh size (0 = auto):").grid(row=r, column=0, sticky=tk.W, padx=8, pady=4)
+        tk.Entry(wiz, textvariable=mesh_var, width=20).grid(row=r, column=1, padx=8, pady=4)
+
+        r += 1
+        tk.Checkbutton(wiz, text="Auto-solve after generation",
+                       variable=auto_solve).grid(
+            row=r, column=0, columnspan=2, sticky=tk.W, padx=8, pady=4)
+
+        r += 1
+        def _do_export():
+            femm_config = {
+                "problem_type": prob_type.get(),
+                "units": units.get(),
+                "depth": depth_var.get(),
+                "voltage_top": v_top.get(),
+                "voltage_bottom": v_bot.get(),
+                "permittivity": eps_r.get(),
+                "mesh_size": mesh_var.get(),
+                "auto_solve": auto_solve.get(),
+            }
+            wiz.destroy()
+            self._export_femm(femm_config)
+
+        tk.Button(wiz, text="Export Lua Script", command=_do_export,
+                  width=22).grid(row=r, column=0, columnspan=2, pady=12)
+
+    def _export_femm(self, femm_config):
+        """Build assembly curves and generate a FEMM Lua script."""
+        is_axi = femm_config.get("problem_type") == "axi"
+
+        try:
+            curves = self._build_assembly_curves(is_axi)
+        except Exception as e:
+            self.status_var.set(f"Error: {e}")
+            return
+
+        path = filedialog.asksaveasfilename(
+            defaultextension=".lua",
+            initialfile=self._default_filename(".lua"),
+            filetypes=[("Lua scripts", "*.lua")])
+        if not path:
+            return
+
+        try:
+            from femm_exporter import FEMMExporter
+            exporter = FEMMExporter()
+            script = exporter.generate_script(curves, femm_config)
+            with open(path, 'w') as f:
+                f.write(script)
+            self.status_var.set(f"Exported FEMM Lua: {path}")
+        except Exception as e:
+            self.status_var.set(f"FEMM export failed: {e}")
 
     # ------------------------------------------------------------------
     # Help / About dialogs
