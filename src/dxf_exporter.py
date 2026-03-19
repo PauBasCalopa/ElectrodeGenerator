@@ -42,7 +42,10 @@ class DXFExporter:
             self.doc.layers.add(layer_name, color=color)
 
         points_3d = [(x, y, 0) for x, y in points]
-        polyline = self.msp.add_lwpolyline(points_3d)
+        if self.doc.dxfversion == 'AC1009':  # R12
+            polyline = self.msp.add_polyline2d(points_3d)
+        else:
+            polyline = self.msp.add_lwpolyline(points_3d)
         polyline.dxf.layer = layer_name
         polyline.dxf.color = color
 
