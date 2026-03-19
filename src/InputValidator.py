@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Author: Pau Bas Calopa
-Version: 1.2.0
+Version: 1.3.0
 Date: March 2026
 License: MIT
 """
