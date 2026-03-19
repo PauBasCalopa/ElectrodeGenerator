@@ -14,12 +14,12 @@ class DXFExporter:
         self.doc = None
         self.msp = None
         
-    def create_new_document(self, dxfversion: str = 'R2010') -> None:
+    def create_new_document(self, dxfversion: str = 'R2000') -> None:
         """
         Create a new DXF document.
-        
+
         Args:
-            dxfversion: DXF version to use (default: R2010)
+            dxfversion: DXF version to use (default: R2000 for max CAD compatibility)
         """
         self.doc = ezdxf.new(dxfversion=dxfversion)
         self.msp = self.doc.modelspace()
@@ -45,6 +45,32 @@ class DXFExporter:
         polyline = self.msp.add_lwpolyline(points_3d)
         polyline.dxf.layer = layer_name
         polyline.dxf.color = color
+
+    def add_spline(self, points: List[Tuple[float, float]],
+                    layer_name: str = 'PROFILE',
+                    color: int = colors.BLUE) -> None:
+        """
+        Add a spline curve through the given (x, y) fit points.
+
+        Splines are preferred over polylines for smooth curves because
+        CAD programs (e.g. SolidWorks) import them as editable spline
+        entities rather than segmented line strips.
+
+        Args:
+            points: List of (x, y) coordinate tuples (fit points)
+            layer_name: Layer name for the curve
+            color: Color index for the curve
+        """
+        if self.doc is None:
+            raise ValueError("Document not created. Call create_new_document() first.")
+
+        if layer_name not in self.doc.layers:
+            self.doc.layers.add(layer_name, color=color)
+
+        fit_points = [(x, y, 0) for x, y in points]
+        spline = self.msp.add_spline(fit_points)
+        spline.dxf.layer = layer_name
+        spline.dxf.color = color
 
     def add_rogowski_curve(self, geometry,
                           layer_name: str = 'ROGOWSKI', 

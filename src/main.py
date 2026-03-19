@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
-Profile Generator — CLI mode.
+Electrode Profile Generator — main entry point.
 
 Usage:
-    python main.py
-    python main.py --profile chang
+    python main.py              Launch GUI (default)
+    python main.py --cli        Interactive CLI mode
+    python main.py --cli --profile chang
 """
 
 import sys
 import argparse
+from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 from profiles import PROFILES, ProfileBase
@@ -31,12 +33,8 @@ def get_user_input(profile: ProfileBase) -> dict:
     return config
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Generate electrode profile geometry")
-    parser.add_argument('--profile', choices=[k.lower() for k in PROFILES],
-                        default='rogowski', help='Profile type (default: rogowski)')
-    args = parser.parse_args()
-
+def run_cli(args):
+    """Run the interactive CLI workflow."""
     profile = PROFILES[args.profile.capitalize()]
 
     print("=" * 60)
@@ -60,27 +58,46 @@ def main():
     print(f"  X: [{bbox['min_x']:.4f}, {bbox['max_x']:.4f}]")
     print(f"  Y: [{bbox['min_y']:.4f}, {bbox['max_y']:.4f}]")
 
+    stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
     # PNG
+    png_path = f"{profile.name}_{stamp}.png"
     plt.figure(figsize=(12, 8))
-    plt.plot(x, y, 'b-', linewidth=2, label=f'{profile.name} Profile')
+    plt.plot(x, y, 'b-', linewidth=2)
     plt.grid(True, alpha=0.3)
     plt.xlabel('X')
     plt.ylabel('Y')
     plt.title(f'{profile.name} Profile')
-    plt.legend()
-    plt.savefig('profile_plot.png', dpi=150, bbox_inches='tight')
+    plt.savefig(png_path, dpi=150, bbox_inches='tight')
     plt.close()
-    print("Plot saved: profile_plot.png")
+    print(f"Plot saved: {png_path}")
 
     # DXF
+    dxf_path = f"{profile.name}_{stamp}.dxf"
     exporter = DXFExporter()
     exporter.create_new_document()
-    exporter.add_polyline(profile.to_polyline_points(config), 'PROFILE')
-    exporter.save_to_file('profile_output.dxf')
+    exporter.add_spline(profile.to_polyline_points(config), 'PROFILE')
+    exporter.save_to_file(dxf_path)
+    print(f"DXF saved: {dxf_path}")
 
     print("\n" + "=" * 60)
     print("Done!")
     print("=" * 60)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Electrode Profile Generator")
+    parser.add_argument('--cli', action='store_true',
+                        help='Run in interactive CLI mode instead of GUI')
+    parser.add_argument('--profile', choices=[k.lower() for k in PROFILES],
+                        default='rogowski', help='Profile type for CLI mode (default: rogowski)')
+    args = parser.parse_args()
+
+    if args.cli:
+        run_cli(args)
+    else:
+        from gui import ProfileGeneratorGUI
+        ProfileGeneratorGUI().run()
 
 
 if __name__ == "__main__":

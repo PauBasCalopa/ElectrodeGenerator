@@ -39,7 +39,7 @@ build = ["pyinstaller>=6.0.0"]
 Repository = "https://github.com/PauBasCalopa/ElectrodeGenerator"
 
 [project.gui-scripts]
-electrode-generator = "src.gui:main"
+electrode-generator = "src.main:main"
 
 [project.scripts]
 electrode-generator-cli = "src.main:main"

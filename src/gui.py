@@ -1,13 +1,13 @@
 """
 Interactive GUI for electrode profile generation.
 
-Usage:
-    python gui.py
+This module defines the GUI class. Launch via main.py.
 """
 
 import csv
 import os
 import sys
+from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import numpy as np
@@ -98,9 +98,10 @@ class ProfileGeneratorGUI:
         self.param_frame = tk.Frame(self.left)
         self.param_frame.pack(fill=tk.X)
 
-        # Electrode gap — always visible, used by all profiles
+        # Electrode assembly
         ttk.Separator(self.left, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=(8, 2))
-        tk.Label(self.left, text="Electrode Gap", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W)
+        tk.Label(self.left, text="Electrode Assembly", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W)
+
         tk.Label(self.left, text="s \u2014 gap between electrodes", font=("Segoe UI", 9)).pack(anchor=tk.W, pady=(2, 0))
         gap_row = tk.Frame(self.left)
         gap_row.pack(fill=tk.X)
@@ -113,17 +114,8 @@ class ProfileGeneratorGUI:
         gap_entry.insert(0, "2.0")
         self._bind_entry_to_var(gap_entry, self.gap, gap_scale)
 
-        # Electrode construction section
-        ttk.Separator(self.left, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=(8, 2))
-        tk.Label(self.left, text="Electrode Construction", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W)
-        tk.Checkbutton(self.left, text="Build electrode assembly",
-                       variable=self.electrode_mode, command=self._schedule_refresh).pack(anchor=tk.W)
-
-        self.assembly_frame = tk.Frame(self.left)
-        self.assembly_frame.pack(fill=tk.X)
-
-        tk.Label(self.assembly_frame, text="d \u2014 flat plate length", font=("Segoe UI", 9)).pack(anchor=tk.W, pady=(4, 0))
-        plate_row = tk.Frame(self.assembly_frame)
+        tk.Label(self.left, text="d \u2014 flat plate length", font=("Segoe UI", 9)).pack(anchor=tk.W, pady=(4, 0))
+        plate_row = tk.Frame(self.left)
         plate_row.pack(fill=tk.X)
         plate_scale = tk.Scale(plate_row, from_=1.0, to=30.0, orient=tk.HORIZONTAL,
                  variable=self.plate_length, resolution=0.5, showvalue=False,
@@ -134,11 +126,8 @@ class ProfileGeneratorGUI:
         plate_entry.insert(0, "5.0")
         self._bind_entry_to_var(plate_entry, self.plate_length, plate_scale)
 
-        # Info labels
-        ttk.Separator(self.left, orient=tk.HORIZONTAL).pack(fill=tk.X, pady=(8, 2))
-        tk.Label(self.left, text="Bounding Box", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W)
-        self.bbox_label = tk.Label(self.left, text="", justify=tk.LEFT, font=("Consolas", 9))
-        self.bbox_label.pack(anchor=tk.W)
+        tk.Checkbutton(self.left, text="Build electrode assembly",
+                       variable=self.electrode_mode, command=self._schedule_refresh).pack(anchor=tk.W, pady=(4, 0))
 
         # Info label for derived values (e.g. k1 for Ernst)
         self.info_label = tk.Label(self.left, text="", justify=tk.LEFT, font=("Consolas", 9), fg="gray")
@@ -318,24 +307,15 @@ class ProfileGeneratorGUI:
         for cx, cy, label in self._curves:
             is_plate = "Plate" in label
             style = dict(linewidth=3, color='#555555', linestyle='-') if is_plate else dict(linewidth=2, color='#1f77b4', linestyle='-')
-            self.ax.plot(cx, cy, label=label, **style)
+            self.ax.plot(cx, cy, **style)
 
         self.ax.set_xlabel("X")
         self.ax.set_ylabel("Y")
         self.ax.set_title(f"{self.profile.name} Profile" if not self.electrode_mode.get()
                           else f"{self.profile.name} Electrode Assembly")
-        self.ax.legend(fontsize=7, loc='upper left')
         self.ax.grid(True, alpha=0.3)
         self.ax.set_aspect('equal', adjustable='datalim')
         self.canvas.draw_idle()
-
-        # Bounding box
-        all_x = np.concatenate([c[0] for c in self._curves])
-        all_y = np.concatenate([c[1] for c in self._curves])
-        self.bbox_label.config(
-            text=f"X: [{np.min(all_x):.4f}, {np.max(all_x):.4f}]\n"
-                 f"Y: [{np.min(all_y):.4f}, {np.max(all_y):.4f}]"
-        )
 
         # Info label for derived values
         info_parts = []
@@ -358,8 +338,14 @@ class ProfileGeneratorGUI:
     # ------------------------------------------------------------------
     # Exports
     # ------------------------------------------------------------------
+    def _default_filename(self, ext: str) -> str:
+        """Generate a default export filename: ProfileType_YYYYMMDD_HHMMSS.ext"""
+        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        return f"{self.profile.name}_{stamp}{ext}"
+
     def _export_csv(self):
         path = filedialog.asksaveasfilename(defaultextension=".csv",
+                                            initialfile=self._default_filename(".csv"),
                                             filetypes=[("CSV files", "*.csv")])
         if not path:
             return
@@ -376,6 +362,7 @@ class ProfileGeneratorGUI:
 
     def _export_png(self):
         path = filedialog.asksaveasfilename(defaultextension=".png",
+                                            initialfile=self._default_filename(".png"),
                                             filetypes=[("PNG files", "*.png")])
         if not path:
             return
@@ -387,18 +374,22 @@ class ProfileGeneratorGUI:
 
     def _export_dxf(self):
         path = filedialog.asksaveasfilename(defaultextension=".dxf",
+                                            initialfile=self._default_filename(".dxf"),
                                             filetypes=[("DXF files", "*.dxf")])
         if not path:
             return
         try:
             exporter = DXFExporter()
-            exporter.create_new_document()
+            exporter.create_new_document(dxfversion='R2000')
             for cx, cy, label in self._curves:
                 points = list(zip(cx.tolist(), cy.tolist()))
                 layer = label.upper().replace(" ", "_").replace("-", "_")
                 is_plate = "PLATE" in layer
                 color = 7 if is_plate else 5  # white for plates, blue for curves
-                exporter.add_polyline(points, layer, color)
+                if is_plate:
+                    exporter.add_polyline(points, layer, color)
+                else:
+                    exporter.add_spline(points, layer, color)
             exporter.save_to_file(path)
             self.status_var.set(f"Exported DXF: {path}")
         except Exception as e:
@@ -427,7 +418,3 @@ class ProfileGeneratorGUI:
     # ------------------------------------------------------------------
     def run(self):
         self.root.mainloop()
-
-
-if __name__ == "__main__":
-    ProfileGeneratorGUI().run()
