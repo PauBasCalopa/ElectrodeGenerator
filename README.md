@@ -64,6 +64,8 @@ ElectrodeGenerator/
 ```
 
 ## Profile Equations
+based on:
+"Espino-Cortes, Fermín & Escarela-Perez, R & Calva-Chavarria, P & Campero-Littlewood, Eduardo. (2000). Numerical study of the profile of parallel plate electrodes. Proceedings of the Universities Power Engineering Conference". 
 
 | Profile  | Equations |
 |----------|-----------|
