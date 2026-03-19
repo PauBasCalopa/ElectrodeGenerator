@@ -1,6 +1,6 @@
 # Electrode Profile Generator
 
-Interactive tool for generating and visualizing electrode profiles (Rogowski, Chang, Ernst) for parallel plate electrode design. Exports to CSV, PNG, and DXF.
+Interactive tool for generating and visualizing electrode profiles (Rogowski, Chang, Ernst) for parallel plate electrode design. Exports to CSV, PNG, DXF, and FEMM 4.2 Lua scripts.
 
 ## Features
 
@@ -9,7 +9,9 @@ Interactive tool for generating and visualizing electrode profiles (Rogowski, Ch
 - **Electrode assembly** — toggle to see full parallel plate construction (4 curves + 2 plates)
 - **Ernst edge-effect** — Auto k₀ button calculates optimal k₀ for edge-free design
 - **European input** — accepts both `.` and `,` as decimal separator
-- **Export** — CSV, PNG (plot), DXF (CAD-ready with named layers)
+- **DXF export wizard** — choose DXF version (R12–R2018), entity type (Spline or Polyline), layer options
+- **FEMM 4.2 export** — Lua script wizard with voltage, permittivity, mesh, and problem type settings
+- **Export** — CSV, PNG, DXF (CAD-ready), FEMM Lua (simulation-ready)
 
 ## Quick Start
 
@@ -18,16 +20,16 @@ Interactive tool for generating and visualizing electrode profiles (Rogowski, Ch
 ```bash
 pip install -r requirements.txt
 cd src
-python gui.py
+python main.py
 ```
 
 ### CLI
 
 ```bash
 cd src
-python main.py
-python main.py --profile chang
-python main.py --profile ernst
+python main.py --cli
+python main.py --cli --profile chang
+python main.py --cli --profile ernst
 ```
 
 ### Build distributable exe
@@ -43,16 +45,17 @@ Output: `dist\ProfileGenerator.exe` (single file, no Python required on target).
 ```
 ElectrodeGenerator/
 ├── src/
+│   ├── main.py             — Single entry point (GUI default, --cli for CLI)
 │   ├── gui.py              — GUI application (Tkinter + matplotlib)
-│   ├── main.py             — CLI entry point
 │   ├── profiles.py         — Profile base class + Rogowski, Chang, Ernst
-│   ├── dxf_exporter.py     — DXF export (ezdxf)
+│   ├── dxf_exporter.py     — DXF export (ezdxf, R12–R2018)
+│   ├── femm_exporter.py    — FEMM 4.2 Lua script generator
 │   ├── InputValidator.py   — Input validation (European decimals, etc.)
 │   └── version.py          — App metadata (name, version, author)
 ├── assets/
 │   └── icon.png            — Application icon
 ├── docs/
-│   └── implementation_plan.md
+│   └── user_guide.md       — User guide and documentation
 ├── build.bat               — PyInstaller build script
 ├── pyproject.toml          — Project metadata & packaging
 ├── requirements.txt        — Python dependencies
