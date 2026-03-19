@@ -4,6 +4,12 @@ Desktop application for designing parallel plate electrodes with mathematically 
 
 The tool provides a real-time interactive GUI, full electrode assembly visualization, and direct export to CAD (DXF), simulation (FEMM 4.2 Lua), and data formats (CSV, PNG).
 
+## Screenshots
+
+| Profile editor | Electrode assembly | FEMM simulation |
+|:-:|:-:|:-:|
+| ![Profile editor](assets/Captura.JPG) | ![Electrode assembly](assets/Captura2.JPG) | ![FEMM simulation](assets/Captura3.JPG) |
+
 ## Why This Tool?
 
 Parallel plate electrodes need carefully shaped edges to avoid field enhancement at the plate boundaries. The profile geometry is derived from conformal mappings and is not trivial to compute by hand. This tool lets you:
