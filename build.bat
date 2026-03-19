@@ -31,12 +31,27 @@ pyinstaller --onefile --windowed ^
     --icon "assets\icon.png" ^
     --paths "src" ^
     --hidden-import "ezdxf" ^
-    --hidden-import "profiles" ^
-    --hidden-import "dxf_exporter" ^
-    --hidden-import "InputValidator" ^
-    --hidden-import "version" ^
+    --hidden-import "core" ^
+    --hidden-import "core.profiles" ^
+    --hidden-import "core.assembly" ^
+    --hidden-import "core.contour" ^
+    --hidden-import "core.optimizer" ^
+    --hidden-import "core.validation" ^
+    --hidden-import "exporters" ^
+    --hidden-import "exporters.csv_exporter" ^
+    --hidden-import "exporters.dxf_exporter" ^
+    --hidden-import "exporters.png_exporter" ^
+    --hidden-import "exporters.femm_exporter" ^
+    --hidden-import "simulation" ^
+    --hidden-import "simulation.femm_model" ^
+    --hidden-import "simulation.femm_simulator" ^
     --hidden-import "gui" ^
-    --hidden-import "femm_exporter" ^
+    --hidden-import "gui.app" ^
+    --hidden-import "gui.dialogs" ^
+    --hidden-import "gui.dialogs.dxf_wizard" ^
+    --hidden-import "gui.dialogs.femm_wizard" ^
+    --hidden-import "gui.dialogs.optimize_wizard" ^
+    --hidden-import "version" ^
     --add-data "assets;assets" ^
     src\main.py
 

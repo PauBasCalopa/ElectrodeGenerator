@@ -1,6 +1,6 @@
 # Electrode Profile Generator — User Guide
 
-**Version 1.3.0** · Pau Bas Calopa · 2026
+**Version 1.4.0** · Pau Bas Calopa · 2026
 
 ---
 
@@ -89,8 +89,8 @@ The **Electrode Assembly** section controls the physical electrode construction:
 
 | Parameter | Description |
 |-----------|-------------|
-| **s** (gap) | Distance between the two parallel electrodes |
-| **d** (plate length) | Length of the flat plate portion of each electrode |
+| **s** (gap) | Distance between the two parallel electrodes (default: 1.0, range: 0.1–10) |
+| **d** (plate length) | Length of the flat plate portion of each electrode (default: 5.0, range: 0.5–30) |
 | **Build electrode assembly** | When checked, displays the full mirrored assembly (top + bottom electrodes with flat plates) |
 
 The gap parameter `s` is always passed to the profile equations — for Rogowski it scales the entire profile, for Chang and Ernst it's available for edge-effect calculations.
@@ -144,7 +144,7 @@ Click **Export FEMM Lua…** to open the FEMM simulation wizard:
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| **Problem type** | planar | `planar` or `axi` (axisymmetric) |
+| **Problem type** | planar | `planar` or `axisymmetric` |
 | **Units** | millimeters | Must match your electrode dimensions |
 | **Depth** | 1.0 | Depth for planar problems (ignored in axi) |
 | **Top electrode voltage** | 1000 V | Fixed voltage on the top electrode |
@@ -260,7 +260,7 @@ Y = v + k · sin(v) · cosh(u)
 v = π/2 (constant)
 ```
 
-- `k` > 0 controls profile compactness (k = 1 gives a Rogowski-like shape)
+- `k` > 0 controls profile compactness (default: 0.85)
 - `u` ∈ [0, u_max] where u_max defines the electrode width
 
 ### Ernst

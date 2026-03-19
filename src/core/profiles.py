@@ -88,16 +88,16 @@ class RogowskiProfile(ProfileBase):
     @property
     def parameters(self) -> List[Dict[str, Any]]:
         return [
-            {'name': 'u_start',    'label': 'u start',                'default': -2.0, 'min': -10.0, 'max': 0.0,  'step': 0.1, 'type': float},
-            {'name': 'u_end',      'label': 'u end',                  'default': 2.0,  'min': 0.0,   'max': 10.0, 'step': 0.1, 'type': float},
-            {'name': 'num_points', 'label': 'Points',                 'default': 100,  'min': 10,    'max': 1000, 'step': 10,  'type': int},
+            {'name': 'u_start',    'label': 'u start',                'default': -3.0, 'min': -6.0, 'max': 0.0, 'step': 0.1, 'type': float},
+            {'name': 'u_end',      'label': 'u end',                  'default': 2.5,  'min': 0.1,  'max': 5.0, 'step': 0.1, 'type': float},
+            {'name': 'num_points', 'label': 'Points',                 'default': 200,  'min': 20,   'max': 500, 'step': 10,  'type': int},
         ]
 
     def generate_points(self, config: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
         s = config.get('s', 1.0)  # fed from assembly gap slider
-        u_start = config.get('u_start', -2.0)
-        u_end = config.get('u_end', 2.0)
-        num_points = int(config.get('num_points', 100))
+        u_start = config.get('u_start', -3.0)
+        u_end = config.get('u_end', 2.5)
+        num_points = int(config.get('num_points', 200))
         v = np.pi / 2
 
         u = np.linspace(u_start, u_end, num_points)
@@ -133,15 +133,15 @@ class ChangProfile(ProfileBase):
     @property
     def parameters(self) -> List[Dict[str, Any]]:
         return [
-            {'name': 'k',          'label': 'k (compactness)',         'default': 1.0, 'min': 0.01, 'max': 2.0,  'step': 0.01, 'type': float},
-            {'name': 'u_end',      'label': 'u max (electrode width)', 'default': 2.0, 'min': 0.1,  'max': 10.0, 'step': 0.1,  'type': float},
-            {'name': 'num_points', 'label': 'Points',                  'default': 100, 'min': 10,   'max': 1000, 'step': 10,   'type': int},
+            {'name': 'k',          'label': 'k (compactness)',         'default': 0.85, 'min': 0.01, 'max': 2.0, 'step': 0.01, 'type': float},
+            {'name': 'u_end',      'label': 'u max (electrode width)', 'default': 2.0,  'min': 0.1,  'max': 5.0, 'step': 0.1,  'type': float},
+            {'name': 'num_points', 'label': 'Points',                  'default': 200,  'min': 20,   'max': 500, 'step': 10,   'type': int},
         ]
 
     def generate_points(self, config: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
-        k = config.get('k', 1.0)
+        k = config.get('k', 0.85)
         u_end = config.get('u_end', 2.0)
-        num_points = int(config.get('num_points', 100))
+        num_points = int(config.get('num_points', 200))
         v = np.pi / 2
 
         u = np.linspace(0.0, u_end, num_points)
@@ -187,16 +187,16 @@ class ErnstProfile(ProfileBase):
     @property
     def parameters(self) -> List[Dict[str, Any]]:
         return [
-            {'name': 'k0',         'label': 'k\u2080 (shape constant)', 'default': 1.0,  'min': 0.0001, 'max': 2.0, 'step': 0.01, 'type': float},
-            {'name': 'u_end',      'label': 'u max (electrode width)',  'default': 2.0,  'min': 0.1,  'max': 10.0, 'step': 0.1,  'type': float},
-            {'name': 'num_points', 'label': 'Points',                   'default': 100,  'min': 10,   'max': 1000, 'step': 10,   'type': int},
+            {'name': 'k0',         'label': 'k\u2080 (shape constant)', 'default': 0.3,   'min': 0.001, 'max': 1.72, 'step': 0.01, 'type': float},
+            {'name': 'u_end',      'label': 'u max (electrode width)',  'default': 3.0,   'min': 0.1,  'max': 10.0, 'step': 0.1,  'type': float},
+            {'name': 'num_points', 'label': 'Points',                   'default': 200,   'min': 20,   'max': 500,  'step': 10,   'type': int},
         ]
 
     def generate_points(self, config: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
-        k0 = config.get('k0', 1.0)
+        k0 = config.get('k0', 0.3)
         k1 = k0 ** 2 / 8.0
-        u_end = config.get('u_end', 2.0)
-        num_points = int(config.get('num_points', 100))
+        u_end = config.get('u_end', 3.0)
+        num_points = int(config.get('num_points', 200))
         v = np.pi / 2
 
         u = np.linspace(0.0, u_end, num_points)

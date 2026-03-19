@@ -60,7 +60,7 @@ class ProfileGeneratorGUI:
 
         # Transform vars
         self.electrode_mode = tk.BooleanVar(value=False)
-        self.gap = tk.DoubleVar(value=2.0)
+        self.gap = tk.DoubleVar(value=1.0)
         self.plate_length = tk.DoubleVar(value=5.0)
 
         # Cached curves for export — always plain Python lists
@@ -113,19 +113,19 @@ class ProfileGeneratorGUI:
         tk.Label(self.left, text="s \u2014 gap between electrodes", font=("Segoe UI", 9)).pack(anchor=tk.W, pady=(2, 0))
         gap_row = tk.Frame(self.left)
         gap_row.pack(fill=tk.X)
-        gap_scale = tk.Scale(gap_row, from_=0.5, to=20.0, orient=tk.HORIZONTAL,
+        gap_scale = tk.Scale(gap_row, from_=0.1, to=10.0, orient=tk.HORIZONTAL,
                  variable=self.gap, resolution=0.1, showvalue=False,
                  command=lambda *_: self._schedule_refresh(), length=170)
         gap_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
         gap_entry = tk.Entry(gap_row, width=8, justify=tk.RIGHT)
         gap_entry.pack(side=tk.RIGHT, padx=(4, 0))
-        gap_entry.insert(0, "2.0")
+        gap_entry.insert(0, "1.0")
         self._bind_entry_to_var(gap_entry, self.gap, gap_scale)
 
         tk.Label(self.left, text="d \u2014 flat plate length", font=("Segoe UI", 9)).pack(anchor=tk.W, pady=(4, 0))
         plate_row = tk.Frame(self.left)
         plate_row.pack(fill=tk.X)
-        plate_scale = tk.Scale(plate_row, from_=1.0, to=30.0, orient=tk.HORIZONTAL,
+        plate_scale = tk.Scale(plate_row, from_=0.5, to=30.0, orient=tk.HORIZONTAL,
                  variable=self.plate_length, resolution=0.5, showvalue=False,
                  command=lambda *_: self._schedule_refresh(), length=170)
         plate_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
