@@ -297,6 +297,15 @@ class ProfileGeneratorGUI:
                      else dict(linewidth=2, color='#1f77b4', linestyle='-'))
             self.ax.plot(cx, cy, **style)
 
+        # Draw E-field measurement contour in electrode mode
+        if self.electrode_mode.get() and self._curves:
+            contour_pts = build_top_contour(self._curves)
+            if contour_pts:
+                cx_c = [p[0] for p in contour_pts]
+                cy_c = [p[1] for p in contour_pts]
+                self.ax.plot(cx_c, cy_c, linewidth=1, color='#e74c3c',
+                             linestyle='--', alpha=0.7, label='E-field contour')
+
         self.ax.set_xlabel("X")
         self.ax.set_ylabel("Y")
         self.ax.set_title(f"{self.profile.name} Profile" if not self.electrode_mode.get()
@@ -506,12 +515,16 @@ class ProfileGeneratorGUI:
         from gui.dialogs.optimize_wizard import show_optimize_wizard
 
         def _on_apply(param_name, value, delta_e):
-            if param_name in self.param_widgets:
+            if param_name == 's':
+                self.gap.set(value)
+            elif param_name == 'd':
+                self.plate_length.set(value)
+            elif param_name in self.param_widgets:
                 self.param_widgets[param_name].set(value)
-                self._schedule_refresh()
-                self.status_var.set(
-                    f"Applied optimal {param_name} = {value:.6f} "
-                    f"(\u0394E = {delta_e:.2f}%)")
+            self._schedule_refresh()
+            self.status_var.set(
+                f"Applied optimal {param_name} = {value:.6f} "
+                f"(\u0394E = {delta_e:.2f}%)")
 
         show_optimize_wizard(
             self.root,

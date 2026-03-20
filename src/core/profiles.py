@@ -221,10 +221,97 @@ class ErnstProfile(ProfileBase):
 
 
 # ---------------------------------------------------------------------------
+# Bruce
+# ---------------------------------------------------------------------------
+class BruceProfile(ProfileBase):
+    """
+    Bruce profile (E. Bruce, 1947).
+
+    Three sections:
+      1. Flat plate (handled by the assembly's plate_length)
+      2. Sinusoidal transition:  y = - R_e · sin(x / x₀ · π/2)
+      3. Circular termination:   quarter-circle of radius R_e
+
+    Constraint equations (smooth transition between sections):
+        x₀ = A / cos(α₀)
+        R_e = (2/π) · x₀ · tan(α₀)
+
+    A ≈ s (gap distance between the electrodes).
+    """
+
+    @property
+    def name(self) -> str:
+        return "Bruce"
+
+    @property
+    def equations(self) -> str:
+        return (
+            "Sinusoidal section:\n"
+            "  Y = \u2212R\u2091 \u00b7 sin(x / x\u2080 \u00b7 \u03c0/2)\n\n"
+            "Circular end: quarter-circle, radius R\u2091\n\n"
+            "x\u2080 = A / cos(\u03b1\u2080)\n"
+            "R\u2091 = (2/\u03c0) \u00b7 x\u2080 \u00b7 tan(\u03b1\u2080)\n"
+            "A \u2248 s  (gap distance)\n\n"
+            "\u03b1\u2080 = characteristic angle\n"
+            "R = R\u2080 + A + R\u2091\n"
+            "T = A\u00b7tan(\u03b1\u2080)\u00b7(1 + 2/(\u03c0\u00b7cos(\u03b1\u2080)))"
+        )
+
+    @property
+    def parameters(self) -> List[Dict[str, Any]]:
+        return [
+            {'name': 'alpha_0', 'label': '\u03b1\u2080 (characteristic angle \u00b0)',
+             'default': 10.0, 'min': 1.0, 'max': 45.0, 'step': 0.5, 'type': float},
+            {'name': 'num_points', 'label': 'Points',
+             'default': 200, 'min': 20, 'max': 500, 'step': 10, 'type': int},
+        ]
+
+    def generate_points(self, config: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
+        A = config.get('s', 1.0)  # gap ≈ characteristic distance
+        alpha_0_deg = config.get('alpha_0', 10.0)
+        num_points = int(config.get('num_points', 200))
+
+        alpha_0 = np.radians(alpha_0_deg)
+        x_o = A / np.cos(alpha_0)
+        R_e = (2.0 / np.pi) * x_o * np.tan(alpha_0)
+
+        # Distribute points: ~70 % sinusoidal, ~30 % circular
+        n_sin = max(int(num_points * 0.7), 2)
+        n_circ = max(num_points - n_sin, 2)
+
+        # --- Rotated coordinate frame ---
+        # The sinusoidal equation uses a frame rotated by α₀
+        # (x_r axis tilted toward the gap).  A = x_o·cos(α₀).
+
+        # Sinusoidal section: x_r ∈ [0, x_o]
+        xr_sin = np.linspace(0.0, x_o, n_sin)
+        yr_sin = -R_e * np.sin(xr_sin / x_o * np.pi / 2.0)
+
+        # Circular end section in rotated frame
+        # Centre at (x_o, 0), radius R_e.
+        # Sweep θ from −π/2 (junction at y_r = −R_e) to 0 (tip at y_r = 0).
+        theta = np.linspace(-np.pi / 2.0, 0.0, n_circ + 1)[1:]  # skip duplicate
+        xr_circ = x_o + R_e * np.cos(theta)
+        yr_circ = R_e * np.sin(theta)
+
+        xr = np.concatenate([xr_sin, xr_circ])
+        yr = np.concatenate([yr_sin, yr_circ])
+
+        # --- Rotate to physical coordinates (counter-clockwise by α₀) ---
+        cos_a = np.cos(alpha_0)
+        sin_a = np.sin(alpha_0)
+        x = xr * cos_a - yr * sin_a
+        y = xr * sin_a + yr * cos_a
+
+        return x, y
+
+
+# ---------------------------------------------------------------------------
 # Registry — the GUI and CLI read from this dict
 # ---------------------------------------------------------------------------
 PROFILES: Dict[str, ProfileBase] = {
     "Rogowski": RogowskiProfile(),
     "Chang": ChangProfile(),
     "Ernst": ErnstProfile(),
+    "Bruce": BruceProfile(),
 }

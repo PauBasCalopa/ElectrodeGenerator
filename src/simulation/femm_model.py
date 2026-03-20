@@ -193,6 +193,8 @@ class FEMMModelBuilder:
         self._add_electrodes(curves, config)
         self._add_outer_box(curves, config)
         self._add_dielectric(curves, config)
+        self._add_electrode_bodies(curves, config)
+        self._add_measurement_contour(curves, config)
         self.backend.ei_zoomnatural()
         self.backend.blank_line()
 
@@ -224,6 +226,7 @@ class FEMMModelBuilder:
         self.backend.blank_line()
 
     def _add_electrodes(self, curves, config):
+        is_axi = config.get("problem_type") == "axi"
         mesh = config.get("mesh_size", 0)
         automesh = 1 if mesh == 0 else 0
 
@@ -245,10 +248,13 @@ class FEMMModelBuilder:
                 if abs(x2 - x1) < 1e-10 and abs(y2 - y1) < 1e-10:
                     continue
                 self.backend.ei_addsegment(x1, y1, x2, y2)
-                mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-                self.backend.ei_selectsegment(mx, my)
-                self.backend.ei_setsegmentprop(boundary, mesh, automesh, 0, group)
-                self.backend.ei_clearselected()
+                # In axi mode, segments on the axis (r=0) are purely
+                # geometric closure — no voltage boundary assigned.
+                if not (is_axi and abs(x1) < 1e-10 and abs(x2) < 1e-10):
+                    mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+                    self.backend.ei_selectsegment(mx, my)
+                    self.backend.ei_setsegmentprop(boundary, mesh, automesh, 0, group)
+                    self.backend.ei_clearselected()
 
         self.backend.blank_line()
 
@@ -275,12 +281,26 @@ class FEMMModelBuilder:
         for i in range(4):
             x1, y1 = corners[i]
             x2, y2 = corners[(i + 1) % 4]
+            if is_axi and abs(x1) < 1e-10 and abs(x2) < 1e-10:
+                # Axis edge: create individual segments between
+                # consecutive axis nodes so every region is closed.
+                axis_ys = set()
+                for cx_c, cy_c, _ in curves:
+                    for xv, yv in zip(cx_c, cy_c):
+                        if abs(xv) < 1e-10:
+                            axis_ys.add(yv)
+                axis_ys.add(y1)
+                axis_ys.add(y2)
+                sorted_ys = sorted(axis_ys, reverse=True)
+                for j in range(len(sorted_ys) - 1):
+                    self.backend.ei_addsegment(
+                        0, sorted_ys[j], 0, sorted_ys[j + 1])
+                continue
             self.backend.ei_addsegment(x1, y1, x2, y2)
-            if not (is_axi and abs(x1) < 1e-10 and abs(x2) < 1e-10):
-                mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-                self.backend.ei_selectsegment(mx, my)
-                self.backend.ei_setsegmentprop("Outer", mesh, automesh, 0, 3)
-                self.backend.ei_clearselected()
+            mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+            self.backend.ei_selectsegment(mx, my)
+            self.backend.ei_setsegmentprop("Outer", mesh, automesh, 0, 3)
+            self.backend.ei_clearselected()
 
         self.backend.blank_line()
 
@@ -299,4 +319,70 @@ class FEMMModelBuilder:
         self.backend.ei_selectlabel(lx, 0)
         self.backend.ei_setblockprop("Dielectric", automesh, mesh, 0)
         self.backend.ei_clearselected()
+        self.backend.blank_line()
+
+    def _add_electrode_bodies(self, curves, config):
+        """Place block labels inside closed electrode contours.
+
+        The electrode interior is meshed with the dielectric material.
+        Because the surface carries a fixed-voltage boundary, the solver
+        naturally produces V = const, E = 0 inside — physically correct
+        without needing the problematic ``<No Mesh>`` region.
+        """
+        has_cap = any(label == "Top-Cap" for _, _, label in curves)
+        if not has_cap:
+            return
+
+        mesh = config.get("mesh_size", 0)
+        automesh = 1 if mesh == 0 else 0
+        is_axi = config.get("problem_type") == "axi"
+
+        # Find the y-extent of the top electrode to place the label
+        # safely inside the closed contour (midway between plate and cap peak).
+        top_ys = [y for _, cy, label in curves
+                  if "Top" in label for y in cy]
+        y_mid = (min(top_ys) + max(top_ys)) / 2
+        lx = max(x for cx, _, _ in curves for x in cx) * 0.25 if is_axi else 0
+
+        self.backend.comment("Electrode bodies")
+        self.backend.ei_addblocklabel(lx, y_mid)
+        self.backend.ei_selectlabel(lx, y_mid)
+        self.backend.ei_setblockprop("Dielectric", automesh, mesh, 1)
+        self.backend.ei_clearselected()
+
+        self.backend.ei_addblocklabel(lx, -y_mid)
+        self.backend.ei_selectlabel(lx, -y_mid)
+        self.backend.ei_setblockprop("Dielectric", automesh, mesh, 2)
+        self.backend.ei_clearselected()
+        self.backend.blank_line()
+
+    def _add_measurement_contour(self, curves, config):
+        """Draw the E-field measurement contour as visible geometry.
+
+        The contour is placed in group 4 with no boundary properties,
+        so it is visible in the pre-processor without affecting the
+        physics.  It also forces mesh edges along the measurement path,
+        improving field-sampling accuracy.
+        """
+        from core.contour import build_top_contour
+
+        pts = build_top_contour(curves)
+        if len(pts) < 2:
+            return
+
+        mesh = config.get("mesh_size", 0)
+        automesh = 1 if mesh == 0 else 0
+
+        self.backend.comment("E-field measurement contour (group 4)")
+        for x, y in pts:
+            self.backend.ei_addnode(x, y)
+
+        for i in range(len(pts) - 1):
+            x1, y1 = pts[i]
+            x2, y2 = pts[i + 1]
+            self.backend.ei_addsegment(x1, y1, x2, y2)
+            mx, my = (x1 + x2) / 2, (y1 + y2) / 2
+            self.backend.ei_selectsegment(mx, my)
+            self.backend.ei_setsegmentprop("", mesh, automesh, 0, 4)
+            self.backend.ei_clearselected()
         self.backend.blank_line()
