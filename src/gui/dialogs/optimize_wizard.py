@@ -8,6 +8,10 @@ import threading
 import tkinter as tk
 from tkinter import ttk, messagebox
 
+from core.validation import InputValidator
+
+_validator = InputValidator()
+
 
 def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
                          on_apply):
@@ -64,23 +68,25 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
     r += 1
     tk.Label(main_frame, text="Search range min:").grid(
         row=r, column=0, sticky=tk.W, pady=4)
-    min_var = tk.DoubleVar(value=0.01)
-    tk.Entry(main_frame, textvariable=min_var, width=20).grid(
-        row=r, column=1, sticky=tk.W, pady=4)
+    min_entry = tk.Entry(main_frame, width=20)
+    min_entry.insert(0, "0.01")
+    min_entry.grid(row=r, column=1, sticky=tk.W, pady=4)
 
     r += 1
     tk.Label(main_frame, text="Search range max:").grid(
         row=r, column=0, sticky=tk.W, pady=4)
-    max_var = tk.DoubleVar(value=2.0)
-    tk.Entry(main_frame, textvariable=max_var, width=20).grid(
-        row=r, column=1, sticky=tk.W, pady=4)
+    max_entry = tk.Entry(main_frame, width=20)
+    max_entry.insert(0, "2.0")
+    max_entry.grid(row=r, column=1, sticky=tk.W, pady=4)
 
     def _update_bounds(_event=None):
         name = param_var.get()
         for p in profile.parameters:
             if p['name'] == name:
-                min_var.set(p['min'])
-                max_var.set(p['max'])
+                min_entry.delete(0, tk.END)
+                min_entry.insert(0, str(p['min']))
+                max_entry.delete(0, tk.END)
+                max_entry.insert(0, str(p['max']))
                 break
     param_combo.bind("<<ComboboxSelected>>", _update_bounds)
     _update_bounds()
@@ -88,18 +94,18 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
     r += 1
     tk.Label(main_frame, text="Tolerance:").grid(
         row=r, column=0, sticky=tk.W, pady=4)
-    tol_var = tk.DoubleVar(value=0.001)
-    tk.Entry(main_frame, textvariable=tol_var, width=20).grid(
-        row=r, column=1, sticky=tk.W, pady=4)
+    tol_entry = tk.Entry(main_frame, width=20)
+    tol_entry.insert(0, "0.001")
+    tol_entry.grid(row=r, column=1, sticky=tk.W, pady=4)
 
     r += 1
     tk.Label(main_frame, text="Max iterations:").grid(
         row=r, column=0, sticky=tk.W, pady=4)
-    maxiter_var = tk.IntVar(value=20)
-    tk.Entry(main_frame, textvariable=maxiter_var, width=20).grid(
-        row=r, column=1, sticky=tk.W, pady=4)
+    maxiter_entry = tk.Entry(main_frame, width=20)
+    maxiter_entry.insert(0, "20")
+    maxiter_entry.grid(row=r, column=1, sticky=tk.W, pady=4)
 
-    # --- Simulation settings ---
+    # --- Simulation settings (reuse shared FEMM fields) ---
     r += 1
     ttk.Separator(main_frame, orient=tk.HORIZONTAL).grid(
         row=r, column=0, columnspan=2, sticky=tk.EW, pady=4)
@@ -109,32 +115,11 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
         row=r, column=0, columnspan=2, sticky=tk.W, pady=4)
 
     r += 1
-    tk.Label(main_frame, text="Top voltage (V):").grid(
-        row=r, column=0, sticky=tk.W, pady=4)
-    vtop_var = tk.DoubleVar(value=1000.0)
-    tk.Entry(main_frame, textvariable=vtop_var, width=20).grid(
-        row=r, column=1, sticky=tk.W, pady=4)
+    sim_frame = tk.Frame(main_frame)
+    sim_frame.grid(row=r, column=0, columnspan=2, sticky=tk.EW, pady=4)
 
-    r += 1
-    tk.Label(main_frame, text="Bottom voltage (V):").grid(
-        row=r, column=0, sticky=tk.W, pady=4)
-    vbot_var = tk.DoubleVar(value=0.0)
-    tk.Entry(main_frame, textvariable=vbot_var, width=20).grid(
-        row=r, column=1, sticky=tk.W, pady=4)
-
-    r += 1
-    tk.Label(main_frame, text="Permittivity (\u03b5r):").grid(
-        row=r, column=0, sticky=tk.W, pady=4)
-    eps_var = tk.DoubleVar(value=1.0)
-    tk.Entry(main_frame, textvariable=eps_var, width=20).grid(
-        row=r, column=1, sticky=tk.W, pady=4)
-
-    r += 1
-    tk.Label(main_frame, text="Mesh size (0=auto):").grid(
-        row=r, column=0, sticky=tk.W, pady=4)
-    mesh_var = tk.DoubleVar(value=0.0)
-    tk.Entry(main_frame, textvariable=mesh_var, width=20).grid(
-        row=r, column=1, sticky=tk.W, pady=4)
+    from gui.dialogs.femm_wizard import _build_femm_fields
+    get_femm_config, _ = _build_femm_fields(sim_frame, include_auto_solve=False)
 
     # --- Progress ---
     r += 1
@@ -170,12 +155,17 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
                           width=18, state=tk.DISABLED)
     apply_btn.pack(side=tk.LEFT, padx=4)
 
+    def _close():
+        cancel_event.set()
+        wiz.destroy()
+
     close_btn = tk.Button(btn_frame, text="Close", width=12,
-                          command=wiz.destroy)
+                          command=_close)
     close_btn.pack(side=tk.LEFT, padx=4)
 
     # --- State ---
     opt_result = {}
+    cancel_event = threading.Event()
 
     def _log(msg):
         progress_text.config(state=tk.NORMAL)
@@ -210,7 +200,38 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
                                    parent=wiz)
             return
 
-        start_btn.config(state=tk.DISABLED, text="Running\u2026")
+        # Validate all numerical inputs
+        errors = []
+
+        r_min = _validator.validate_float(min_entry.get())
+        if not r_min:
+            errors.append(f"Search range min: {r_min.error_message}")
+        r_max = _validator.validate_float(max_entry.get())
+        if not r_max:
+            errors.append(f"Search range max: {r_max.error_message}")
+        if r_min and r_max and r_min.value >= r_max.value:
+            errors.append("Search range min must be less than max")
+
+        r_tol = _validator.validate_float(tol_entry.get())
+        if not r_tol:
+            errors.append(f"Tolerance: {r_tol.error_message}")
+        r_iter = _validator.validate_integer(maxiter_entry.get())
+        if not r_iter:
+            errors.append(f"Max iterations: {r_iter.error_message}")
+
+        if errors:
+            messagebox.showwarning("Invalid input",
+                                   "\n".join(errors),
+                                   parent=wiz)
+            return
+
+        femm_config = get_femm_config()
+        if femm_config is None:
+            return
+
+        cancel_event.clear()
+        start_btn.config(state=tk.NORMAL, text="Cancel")
+        start_btn.config(command=lambda: cancel_event.set())
         apply_btn.config(state=tk.DISABLED)
         progress_text.config(state=tk.NORMAL)
         progress_text.delete("1.0", tk.END)
@@ -218,19 +239,10 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
         result_label.config(text="")
         opt_result.clear()
 
-        # Capture all GUI state before spawning thread
-        bounds = (min_var.get(), max_var.get())
-        tolerance = tol_var.get()
-        max_iter = maxiter_var.get()
-        femm_config = {
-            "problem_type": "planar",
-            "units": "millimeters",
-            "depth": 1.0,
-            "voltage_top": vtop_var.get(),
-            "voltage_bottom": vbot_var.get(),
-            "permittivity": eps_var.get(),
-            "mesh_size": mesh_var.get(),
-        }
+        # Capture validated values before spawning thread
+        bounds = (r_min.value, r_max.value)
+        tolerance = r_tol.value
+        max_iter = r_iter.value
 
         def _run():
             import pythoncom
@@ -241,14 +253,18 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
                     profile, current_config, gap, plate_length, femm_config)
                 optimizer.optimize(
                     param_name, bounds, tolerance, max_iter,
-                    callback=_on_optimizer_event)
+                    callback=_on_optimizer_event,
+                    cancel_flag=cancel_event)
             except Exception as e:
                 err_msg = str(e)
                 wiz.after(0, lambda m=err_msg: _log(f"\nERROR: {m}"))
             finally:
                 pythoncom.CoUninitialize()
-                wiz.after(0, lambda: start_btn.config(
-                    state=tk.NORMAL, text="Start Optimization"))
+                def _restore():
+                    start_btn.config(state=tk.NORMAL,
+                                     text="Start Optimization",
+                                     command=_start)
+                wiz.after(0, _restore)
 
         threading.Thread(target=_run, daemon=True).start()
 

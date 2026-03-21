@@ -1,6 +1,6 @@
 # Electrode Profile Generator — User Guide
 
-**Version 1.4.0** · Pau Bas Calopa · 2026
+**Version 1.6.0** · Pau Bas Calopa · 2026
 
 ---
 
@@ -20,15 +20,17 @@
    - [FEMM Lua Export](#femm-lua-export)
 5. [Using with SolidWorks](#using-with-solidworks)
 6. [Using with FEMM 4.2](#using-with-femm-42)
-7. [CLI Mode](#cli-mode)
-8. [Building the Executable](#building-the-executable)
-9. [Profile Equations Reference](#profile-equations-reference)
+7. [Live Simulation](#live-simulation)
+8. [Profile Optimizer](#profile-optimizer)
+9. [CLI Mode](#cli-mode)
+10. [Building the Executable](#building-the-executable)
+11. [Profile Equations Reference](#profile-equations-reference)
 
 ---
 
 ## Overview
 
-The Electrode Profile Generator is a desktop tool for designing parallel plate electrodes with mathematically defined edge profiles. It supports three profile types (Rogowski, Chang, Ernst), provides a live interactive preview, and exports geometry for CAD (SolidWorks, AutoCAD) and FEM simulation (FEMM 4.2).
+The Electrode Profile Generator is a desktop tool for designing parallel plate electrodes with mathematically defined edge profiles. It supports four profile types (Rogowski, Chang, Ernst, Bruce), provides a live interactive preview with electrode closing arcs, and exports geometry for CAD (SolidWorks, AutoCAD) and FEM simulation (FEMM 4.2).
 
 ---
 
@@ -69,9 +71,10 @@ Use the **Profile Type** dropdown at the top to switch between:
 
 | Profile    | Description |
 |------------|-------------|
-| **Rogowski** | Classic Rogowski profile, scaled by electrode gap `s` |
+| **Rogowski** | Classic conformal-mapping profile, scaled by electrode gap `s` |
 | **Chang**    | Parametric profile with compactness factor `k` |
 | **Ernst**    | Two-term profile with auto-calculated k₁ = k₀²/8 |
+| **Bruce**    | Piecewise profile: sinusoidal transition + circular termination |
 
 When you change the profile, the parameter sliders update automatically.
 
@@ -89,11 +92,11 @@ The **Electrode Assembly** section controls the physical electrode construction:
 
 | Parameter | Description |
 |-----------|-------------|
-| **s** (gap) | Distance between the two parallel electrodes (default: 1.0, range: 0.1–10) |
-| **d** (plate length) | Length of the flat plate portion of each electrode (default: 5.0, range: 0.5–30) |
-| **Build electrode assembly** | When checked, displays the full mirrored assembly (top + bottom electrodes with flat plates) |
+| **s** (gap) | Distance between the two parallel electrodes |
+| **d** (plate length) | Length of the flat plate portion of each electrode |
+| **Build electrode assembly** | When checked, displays the full mirrored assembly with closing arcs |
 
-The gap parameter `s` is always passed to the profile equations — for Rogowski it scales the entire profile, for Chang and Ernst it's available for edge-effect calculations.
+The assembly consists of profiles, flat plates, and closing arcs. In planar mode, a tangent arc connects the right and left profile tips. In axisymmetric mode, the arc runs from the profile tip to the axis (r = 0), arriving perpendicular to the axis.
 
 ### Ernst Auto k₀
 
@@ -103,7 +106,7 @@ When using the Ernst profile, the **Auto k₀ (no edge effect)** button calculat
 k₀ = 1.72 · e^(-3.5·s)
 ```
 
-This relationship is valid for s < 3. At s ≈ 3, edge effects become significant and a warning is shown in the info area.
+This relationship is valid for s < 3. At s ≈ 3, edge effects become significant and a warning is shown.
 
 ---
 
@@ -114,8 +117,6 @@ All exports use a default filename of `ProfileType_YYYYMMDD_HHMMSS.ext`.
 ### CSV Export
 
 Exports all visible curves as a table with columns: `curve`, `x`, `y`.
-
-Each curve (e.g. Top-Right, Top-Left, Top Plate, Bot-Right, Bot-Left, Bot Plate) is labelled in the `curve` column.
 
 ### PNG Export
 
@@ -133,10 +134,9 @@ Click **Export DXF…** to open the DXF wizard:
 
 **Notes:**
 
-- **R12** is required for FEMM 4.2 DXF import (ASCII R12 format). When R12 is selected, the curve type is automatically set to Polyline (R12 does not support SPLINE entities).
-- **Spline** entities are recommended for SolidWorks — they import as editable sketch splines rather than segmented polylines.
-- Flat plates are always exported as polylines regardless of the curve type setting (they are straight lines).
-- When "Merge into one layer" is off, each curve gets its own named layer (e.g. `TOP_RIGHT`, `BOT_PLATE`).
+- **R12** is required for FEMM 4.2 DXF import. When R12 is selected, the curve type is automatically set to Polyline.
+- **Spline** entities are recommended for SolidWorks — they import as editable sketch splines.
+- Structural curves (plates, caps) are always exported as polylines.
 
 ### FEMM Lua Export
 
@@ -151,34 +151,16 @@ Click **Export FEMM Lua…** to open the FEMM simulation wizard:
 | **Bottom electrode voltage** | 0 V | Fixed voltage on the bottom electrode |
 | **Relative permittivity (εr)** | 1.0 | Permittivity of the gap dielectric (1.0 = vacuum/air) |
 | **Mesh size** | 0 (auto) | Element size; 0 lets FEMM auto-mesh |
-| **Auto-solve** | off | When checked, the script runs `ei_analyze()` + `ei_loadsolution()` |
-
-**What the generated Lua script does:**
-
-1. Creates a new electrostatic document (`newdocument(1)`)
-2. Defines the problem (units, type, precision)
-3. Adds a dielectric material with the specified εr
-4. Defines boundary conditions (top voltage, bottom voltage, outer Neumann boundary)
-5. Builds the full electrode assembly geometry as nodes + segments
-6. Assigns voltage boundary conditions to electrode segments
-7. Creates an outer boundary rectangle with padding
-8. Places a dielectric block label in the gap region
-9. Optionally runs the solver
-
-**Axisymmetric mode:** Only the right half of the assembly is exported (r ≥ 0). The left boundary at r = 0 is the axis of symmetry, which FEMM handles automatically.
+| **Auto-solve** | off | When checked, the script runs the solver automatically |
 
 ---
 
 ## Using with SolidWorks
 
-1. In the GUI, configure your profile and electrode assembly
-2. Click **Export DXF…**
-3. Settings: **R2000** + **Spline** (defaults)
-4. In SolidWorks: **File → Open** → select the `.dxf` file
-5. SolidWorks imports the splines as editable sketch entities
-6. Use the sketch for revolve, extrude, or loft operations to build the 3D electrode
-
-**Tip:** Use "Merge into one layer" if you want to select all geometry at once in SolidWorks.
+1. Configure your profile and electrode assembly
+2. Click **Export DXF…** → settings: **R2000** + **Spline**
+3. In SolidWorks: **File → Open** → select the `.dxf` file
+4. Use the sketch for revolve, extrude, or loft operations
 
 ---
 
@@ -186,27 +168,53 @@ Click **Export FEMM Lua…** to open the FEMM simulation wizard:
 
 ### Method 1: Lua Script (recommended)
 
-1. In the GUI, configure your profile and assembly parameters (gap, plate length)
-2. Click **Export FEMM Lua…**
-3. Fill in the simulation parameters (voltages, permittivity, etc.)
-4. Save the `.lua` file
-5. Open **FEMM 4.2**
-6. Go to **File → Open Lua Script** (or press the Lua console button)
-7. Load and run the script — the geometry, materials, and boundary conditions are created automatically
-8. If auto-solve was checked, the results are ready immediately
+1. Configure your profile and assembly parameters
+2. Click **Export FEMM Lua…** → fill in simulation parameters → save
+3. In FEMM: **File → Open Lua Script** → load and run
 
 ### Method 2: DXF Import (geometry only)
 
-1. Click **Export DXF…**
-2. Settings: **R12** + **Polyline** (auto-set when R12 is chosen)
-3. Save the `.dxf` file
-4. In FEMM: **File → Import DXF**
-5. You will need to manually assign materials and boundary conditions
+1. Click **Export DXF…** → settings: **R12** + **Polyline** → save
+2. In FEMM: **File → Import DXF**
+3. Manually assign materials and boundary conditions
 
-The Lua script method is strongly recommended — it sets up the complete simulation in one step.
+### Method 3: Live Simulation
+
+Use **Run FEMM Simulation…** to drive FEMM directly from the GUI. See [Live Simulation](#live-simulation).
 
 ---
 
+## Live Simulation
+
+Click **Run FEMM Simulation…** to open the FEMM simulation wizard. This requires `pyfemm` and FEMM 4.2 installed.
+
+The simulation:
+
+1. Opens FEMM (hidden)
+2. Builds the complete model (geometry, materials, boundaries)
+3. Meshes and solves
+4. Selects a measuring contour along the top electrode (with an offset into the gap)
+5. Extracts the electric field along the contour
+6. Displays an E-field plot
+
+In axisymmetric mode, the measuring contour starts from the axis (r = 0) and follows the top electrode profile outward.
+
+---
+
+## Profile Optimizer
+
+Click **Optimize…** to open the optimization wizard. It performs a golden-section search over a selected profile parameter to minimize field enhancement (ΔE%):
+
+| Setting | Description |
+|---------|-------------|
+| **Parameter** | Which profile parameter to vary |
+| **Range** | Min/max search bounds |
+| **Tolerance** | Convergence threshold |
+| **Max iterations** | Limit on evaluations |
+
+Each iteration runs a full FEMM simulation. Progress is displayed in real time. Click **Cancel** to stop the optimization at any time. When complete, click **Apply to Profile** to use the optimal value.
+
+---
 ## CLI Mode
 
 For headless or scripted use:
@@ -216,6 +224,7 @@ cd src
 python main.py --cli                      # Rogowski (default)
 python main.py --cli --profile chang      # Chang profile
 python main.py --cli --profile ernst      # Ernst profile
+python main.py --cli --profile bruce      # Bruce profile
 ```
 
 The CLI prompts for each parameter interactively and exports both a PNG plot and a DXF file with timestamped filenames.
@@ -242,6 +251,8 @@ This creates `dist\ProfileGenerator.exe` — a single-file executable that inclu
 
 ### Rogowski
 
+The Rogowski profile is derived from conformal mapping and scaled by electrode gap `s`:
+
 ```
 X = (s/π) · (u + 1 + eᵘ · cos(v))
 Y = (s/π) · (v + eᵘ · sin(v))
@@ -249,10 +260,12 @@ v = π/2 (constant)
 ```
 
 - `s` = electrode gap (scales the entire profile)
-- `u` = parameter variable
+- `u` = parameter variable (u ∈ [u_min, 0])
 - As u → −∞, Y → s/2 (the natural gap between two mirrored Rogowski curves is exactly `s`)
 
 ### Chang
+
+The Chang profile uses a parametric conformal mapping with a compactness factor:
 
 ```
 X = u + cos(v) · sinh(u)
@@ -264,6 +277,8 @@ v = π/2 (constant)
 - `u` ∈ [0, u_max] where u_max defines the electrode width
 
 ### Ernst
+
+The Ernst profile adds a second-order correction term to the Chang mapping:
 
 ```
 X = u + k₀ · cos(v) · sinh(u) + k₁ · cos(2v) · sinh(2u)
@@ -285,3 +300,22 @@ k₁ = k₀² / 8 (auto-calculated)
 | k₀ = 1.72 · e⁻³·⁵ˢ | Combined: optimal k₀ from electrode distance |
 
 Edge effects become considerable at s ≈ 3.
+
+### Bruce
+
+The Bruce profile is a piecewise construction with a sinusoidal transition zone followed by a circular termination:
+
+```
+Region 1 — Sinusoidal (α₀ ≤ α ≤ π/2):
+  Xbr = (s/2) · sin(α)
+  Ybr = (s/2) · (π/2 − α + sin(α)·cos(α)) / sin²(α₀)
+
+Region 2 — Circular (0 ≤ α ≤ α₀):
+  Xbr = R₀ − R₀·cos(α) + X(α₀)
+  Ybr = R₀·sin(α)
+  R₀  = (s/2) / sin²(α₀)
+```
+
+- `α₀` = characteristic angle that defines the transition between sinusoidal and circular regions
+- `s` = electrode gap
+- The profile endpoints are rotated into the standard electrode coordinate frame

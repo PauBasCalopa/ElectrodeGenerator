@@ -21,7 +21,8 @@ class ProfileOptimizer:
         self.plate_length = plate_length
         self.femm_config = femm_config
 
-    def optimize(self, param_name, bounds, tolerance, max_iter, callback=None):
+    def optimize(self, param_name, bounds, tolerance, max_iter, callback=None,
+                 cancel_flag=None):
         """Run golden-section search.
 
         Args:
@@ -54,6 +55,11 @@ class ProfileOptimizer:
             best_val, best_fef = None, float('inf')
 
             for iteration in range(max_iter):
+                if cancel_flag and cancel_flag.is_set():
+                    if callback:
+                        callback('log', "\nOptimization cancelled.")
+                    return {}
+
                 if abs(b - a) < tolerance:
                     if callback:
                         callback('log', "Converged.")
@@ -85,7 +91,8 @@ class ProfileOptimizer:
                 cfg = dict(self.base_config)
                 cfg[param_name] = best_val
                 x, y = self.profile.generate_points(cfg)
-                curves = build_assembly_curves(x, y, self.gap, self.plate_length)
+                is_axi = self.femm_config.get('problem_type') == 'axi'
+                curves = build_assembly_curves(x, y, self.gap, self.plate_length, is_axi=is_axi)
                 sim.build_and_solve(curves, self.femm_config)
                 contour = build_top_contour(curves)
                 dist, evals = sim.get_field_along_contour(contour)
@@ -118,7 +125,8 @@ class ProfileOptimizer:
         cfg = dict(self.base_config)
         cfg[param_name] = value
         x, y = self.profile.generate_points(cfg)
-        curves = build_assembly_curves(x, y, self.gap, self.plate_length)
+        is_axi = self.femm_config.get('problem_type') == 'axi'
+        curves = build_assembly_curves(x, y, self.gap, self.plate_length, is_axi=is_axi)
 
         sim.build_and_solve(curves, self.femm_config)
 

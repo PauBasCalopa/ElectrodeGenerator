@@ -1,7 +1,11 @@
 """FEMM configuration wizard dialogs (export and simulation)."""
 
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, messagebox
+
+from core.validation import InputValidator
+
+_validator = InputValidator()
 
 
 def _build_femm_fields(wiz, include_auto_solve=True):
@@ -9,17 +13,13 @@ def _build_femm_fields(wiz, include_auto_solve=True):
 
     Returns:
         ``(get_config, next_row)`` — *get_config* is a callable that
-        reads all widgets and returns a config dict; *next_row* is the
-        grid row index after the last field so callers can append
-        their own buttons.
+        reads and validates all widgets and returns a config dict
+        (or None on validation error); *next_row* is the grid row
+        index after the last field so callers can append their own
+        buttons.
     """
     prob_type = tk.StringVar(value="planar")
     units = tk.StringVar(value="millimeters")
-    depth_var = tk.DoubleVar(value=1.0)
-    v_top = tk.DoubleVar(value=1000.0)
-    v_bot = tk.DoubleVar(value=0.0)
-    eps_r = tk.DoubleVar(value=1.0)
-    mesh_var = tk.DoubleVar(value=0.0)
     auto_solve = tk.BooleanVar(value=False)
 
     r = 0
@@ -41,8 +41,9 @@ def _build_femm_fields(wiz, include_auto_solve=True):
     r += 1
     tk.Label(wiz, text="Depth (planar):").grid(
         row=r, column=0, sticky=tk.W, padx=8, pady=4)
-    tk.Entry(wiz, textvariable=depth_var, width=20).grid(
-        row=r, column=1, padx=8, pady=4)
+    depth_entry = tk.Entry(wiz, width=20)
+    depth_entry.insert(0, "1.0")
+    depth_entry.grid(row=r, column=1, padx=8, pady=4)
 
     r += 1
     ttk.Separator(wiz, orient=tk.HORIZONTAL).grid(
@@ -51,20 +52,23 @@ def _build_femm_fields(wiz, include_auto_solve=True):
     r += 1
     tk.Label(wiz, text="Top electrode voltage (V):").grid(
         row=r, column=0, sticky=tk.W, padx=8, pady=4)
-    tk.Entry(wiz, textvariable=v_top, width=20).grid(
-        row=r, column=1, padx=8, pady=4)
+    vtop_entry = tk.Entry(wiz, width=20)
+    vtop_entry.insert(0, "1000.0")
+    vtop_entry.grid(row=r, column=1, padx=8, pady=4)
 
     r += 1
     tk.Label(wiz, text="Bottom electrode voltage (V):").grid(
         row=r, column=0, sticky=tk.W, padx=8, pady=4)
-    tk.Entry(wiz, textvariable=v_bot, width=20).grid(
-        row=r, column=1, padx=8, pady=4)
+    vbot_entry = tk.Entry(wiz, width=20)
+    vbot_entry.insert(0, "0.0")
+    vbot_entry.grid(row=r, column=1, padx=8, pady=4)
 
     r += 1
     tk.Label(wiz, text="Relative permittivity (\u03b5r):").grid(
         row=r, column=0, sticky=tk.W, padx=8, pady=4)
-    tk.Entry(wiz, textvariable=eps_r, width=20).grid(
-        row=r, column=1, padx=8, pady=4)
+    epsr_entry = tk.Entry(wiz, width=20)
+    epsr_entry.insert(0, "1.0")
+    epsr_entry.grid(row=r, column=1, padx=8, pady=4)
 
     r += 1
     ttk.Separator(wiz, orient=tk.HORIZONTAL).grid(
@@ -73,8 +77,9 @@ def _build_femm_fields(wiz, include_auto_solve=True):
     r += 1
     tk.Label(wiz, text="Mesh size (0 = auto):").grid(
         row=r, column=0, sticky=tk.W, padx=8, pady=4)
-    tk.Entry(wiz, textvariable=mesh_var, width=20).grid(
-        row=r, column=1, padx=8, pady=4)
+    mesh_entry = tk.Entry(wiz, width=20)
+    mesh_entry.insert(0, "0.0")
+    mesh_entry.grid(row=r, column=1, padx=8, pady=4)
 
     if include_auto_solve:
         r += 1
@@ -83,14 +88,39 @@ def _build_femm_fields(wiz, include_auto_solve=True):
             row=r, column=0, columnspan=2, sticky=tk.W, padx=8, pady=4)
 
     def _get_config():
+        """Read and validate all fields. Returns config dict or None on error."""
+        errors = []
+
+        fields = [
+            ("Depth", depth_entry, {}),
+            ("Top electrode voltage", vtop_entry, {}),
+            ("Bottom electrode voltage", vbot_entry, {}),
+            ("Relative permittivity", epsr_entry, {}),
+            ("Mesh size", mesh_entry, {}),
+        ]
+        values = {}
+        for label, entry_w, opts in fields:
+            result = _validator.validate_float(entry_w.get(), **opts)
+            if not result.is_valid:
+                errors.append(f"{label}: {result.error_message}")
+            else:
+                values[label] = result.value
+
+        if errors:
+            messagebox.showwarning(
+                "Invalid input",
+                "\n".join(errors),
+                parent=wiz)
+            return None
+
         cfg = {
             "problem_type": prob_type.get(),
             "units": units.get(),
-            "depth": depth_var.get(),
-            "voltage_top": v_top.get(),
-            "voltage_bottom": v_bot.get(),
-            "permittivity": eps_r.get(),
-            "mesh_size": mesh_var.get(),
+            "depth": values["Depth"],
+            "voltage_top": values["Top electrode voltage"],
+            "voltage_bottom": values["Bottom electrode voltage"],
+            "permittivity": values["Relative permittivity"],
+            "mesh_size": values["Mesh size"],
         }
         if include_auto_solve:
             cfg["auto_solve"] = auto_solve.get()
@@ -120,6 +150,8 @@ def show_femm_wizard(parent, on_export):
 
     def _do_export():
         femm_config = get_config()
+        if femm_config is None:
+            return
         wiz.destroy()
         on_export(femm_config)
 
@@ -148,6 +180,8 @@ def show_simulate_wizard(parent, on_simulate):
 
     def _do_simulate():
         femm_config = get_config()
+        if femm_config is None:
+            return
         wiz.destroy()
         on_simulate(femm_config)
 

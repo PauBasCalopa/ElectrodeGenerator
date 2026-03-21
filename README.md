@@ -1,8 +1,8 @@
 # Electrode Profile Generator
 
-Desktop application for designing parallel plate electrodes with mathematically defined edge profiles. Based on conformal mapping theory, it generates Rogowski, Chang, and Ernst profiles — the three classic geometries used in high-voltage engineering to control electric field uniformity between parallel plates.
+Desktop application for designing parallel plate electrodes with mathematically defined edge profiles. Based on conformal mapping theory, it generates Rogowski, Chang, Ernst, and Bruce profiles — the four classic geometries used in high-voltage engineering to control electric field uniformity between parallel plates.
 
-The tool provides a real-time interactive GUI, full electrode assembly visualization, and direct export to CAD (DXF), simulation (FEMM 4.2 Lua), and data formats (CSV, PNG).
+The tool provides a real-time interactive GUI, full electrode assembly visualization with closing arcs, and direct export to CAD (DXF), simulation (FEMM 4.2 Lua), and data formats (CSV, PNG).
 
 ## Screenshots
 
@@ -15,24 +15,26 @@ The tool provides a real-time interactive GUI, full electrode assembly visualiza
 Parallel plate electrodes need carefully shaped edges to avoid field enhancement at the plate boundaries. The profile geometry is derived from conformal mappings and is not trivial to compute by hand. This tool lets you:
 
 - **Explore** different profile types and parameters interactively
-- **Visualize** the complete electrode assembly (top + bottom electrodes with flat plates)
+- **Visualize** the complete electrode assembly (top + bottom electrodes with flat plates and closing arcs)
 - **Export** directly to SolidWorks/AutoCAD (DXF) or FEMM 4.2 (Lua script)
-- **Simulate** electrostatic fields in FEMM without manual model setup
+- **Simulate** electrostatic fields in FEMM without manual model setup (planar and axisymmetric)
 - **Optimize** electrode geometry via built-in golden-section search
 
 ## Features
 
 | Feature | Description |
 |---------|-------------|
-| **3 profile types** | Rogowski, Chang, Ernst — selectable from a dropdown |
+| **4 profile types** | Rogowski, Chang, Ernst, Bruce — selectable from a dropdown |
 | **Live preview** | Sliders + text entry update the plot in real time |
-| **Electrode assembly** | Toggle full mirrored construction (4 curves + 2 flat plates) |
+| **Electrode assembly** | Full mirrored construction with closing arcs (tangent to profile) |
+| **Planar & axisymmetric** | Support for both 2D planar and axisymmetric electrode geometries |
 | **Ernst Auto k₀** | One-click calculation of optimal k₀ for edge-free design |
 | **DXF export wizard** | R12–R2018, Spline or Polyline, layer control |
 | **FEMM Lua wizard** | Complete simulation setup: voltages, εᵣ, mesh, boundary conditions |
 | **FEMM live simulation** | Run FEMM directly from the GUI (requires pyfemm) |
-| **Profile optimizer** | Golden-section search to minimize field non-uniformity |
-| **European input** | Accepts both `.` and `,` as decimal separator |
+| **Profile optimizer** | Golden-section search to minimize field non-uniformity (cancellable) |
+| **Input validation** | All numerical inputs validated with clear error messages; accepts both `.` and `,` as decimal separator (European format) |
+| **Built-in user manual** | Chapter-based help accessible from the Help menu |
 
 ## Quick Start
 
@@ -53,9 +55,9 @@ src/
 ├── main.py                  — Entry point (GUI default, --cli for CLI)
 ├── version.py               — App metadata
 ├── core/                    — Pure logic (no UI)
-│   ├── profiles.py          — Rogowski, Chang, Ernst generators
-│   ├── assembly.py          — Electrode assembly builder
-│   ├── contour.py           — Contour utilities
+│   ├── profiles.py          — Rogowski, Chang, Ernst, Bruce generators
+│   ├── assembly.py          — Electrode assembly builder (profiles + plates + arcs)
+│   ├── contour.py           — Measuring contour utilities
 │   ├── optimizer.py         — Golden-section optimizer
 │   └── validation.py        — Input validation
 ├── exporters/               — File output
@@ -64,24 +66,68 @@ src/
 │   ├── dxf_exporter.py      — DXF export (R12–R2018)
 │   └── femm_exporter.py     — FEMM Lua script generator
 ├── simulation/              — FEMM integration
-│   ├── femm_model.py        — Shared model builder
+│   ├── femm_model.py        — Shared model builder (pluggable backends)
 │   └── femm_simulator.py    — Live FEMM COM driver
 └── gui/                     — Tkinter GUI
     ├── app.py               — Main application window
-    └── dialogs/             — DXF, FEMM, and optimizer wizards
+    └── dialogs/             — DXF, FEMM, optimizer, and help dialogs
 ```
 
 ## Profile Equations
 
 Based on: *Espino-Cortes, F. et al. (2000). "Numerical study of the profile of parallel plate electrodes." Proceedings of the Universities Power Engineering Conference.*
 
-| Profile | Equations | Key parameter |
-|---------|-----------|---------------|
-| **Rogowski** | X = (s/π)(u + 1 + eᵘ cos v) · Y = (s/π)(v + eᵘ sin v) | s (gap) scales the profile |
-| **Chang** | X = u + cos(v)·sinh(u) · Y = v + k·sin(v)·cosh(u) | k controls compactness |
-| **Ernst** | X = u + k₀·cos(v)·sinh(u) + k₁·cos(2v)·sinh(2u) · Y = … | k₁ = k₀²/8, Auto k₀ = 1.72·e⁻³·⁵ˢ |
+### Rogowski
 
-Where v = π/2 (constant) in all profiles.
+Derived from a conformal mapping of the half-plane:
+
+$$X = \frac{s}{\pi} \left(u + 1 + e^u \cos v\right)$$
+
+$$Y = \frac{s}{\pi} \left(v + e^u \sin v\right)$$
+
+where $v = \pi/2$ (constant) and $s$ is the electrode gap. As $u \to -\infty$, $Y \to s/2$ — the natural gap between two mirrored Rogowski curves is exactly $s$.
+
+### Chang
+
+Single-parameter conformal mapping with compactness control:
+
+$$X = u + \cos(v) \cdot \sinh(u)$$
+
+$$Y = v + k \cdot \sin(v) \cdot \cosh(u)$$
+
+where $v = \pi/2$ (constant), $u \in [0, u_{\max}]$, and $k > 0$ controls the profile compactness.
+
+### Ernst
+
+Two-term extension of Chang with automatic harmonic coefficient:
+
+$$X = u + k_0 \cos(v) \sinh(u) + k_1 \cos(2v) \sinh(2u)$$
+
+$$Y = v + k_0 \sin(v) \cosh(u) + k_1 \sin(2v) \cosh(2u)$$
+
+where $v = \pi/2$, $k_1 = k_0^2 / 8$, and $u \in [0, u_{\max}]$.
+
+**Optimal k₀ (edge-effect free):**
+
+$$k_0 = 1.72 \cdot e^{-3.5s}$$
+
+Valid for $s < 3$. Edge effects become significant at $s \approx 3$.
+
+### Bruce
+
+Piecewise profile with sinusoidal transition and circular termination:
+
+**Sinusoidal section:**
+
+$$Y = -R_e \sin\!\left(\frac{x}{x_0} \cdot \frac{\pi}{2}\right)$$
+
+**Circular end:** quarter-circle of radius $R_e$.
+
+**Constraint equations:**
+
+$$x_0 = \frac{A}{\cos(\alpha_0)}, \qquad R_e = \frac{2}{\pi} \cdot x_0 \cdot \tan(\alpha_0)$$
+
+where $A \approx s$ (gap distance) and $\alpha_0$ is the characteristic angle.
 
 ## Dependencies
 

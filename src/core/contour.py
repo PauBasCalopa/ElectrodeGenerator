@@ -30,6 +30,7 @@ def build_top_contour(curves, offset=1e-3):
             parts[label] = list(zip(cx, cy))
 
     contour = []
+    is_axi = "Top-Left" not in parts
     if "Top-Left" in parts:
         contour.extend(reversed(parts["Top-Left"]))
     if "Top Plate" in parts:
@@ -37,10 +38,14 @@ def build_top_contour(curves, offset=1e-3):
     if "Top-Right" in parts:
         contour.extend(parts["Top-Right"])
 
-    # Drop the first and last vertex – they sit at the electrode
-    # tips where the geometry creates an artificial singularity.
+    # Drop vertices at electrode tips where the geometry creates an
+    # artificial singularity.  In axi mode, keep the first point
+    # (it sits on the axis, not at a tip).
     if len(contour) > 2:
-        contour = contour[1:-1]
+        if is_axi:
+            contour = contour[:-1]
+        else:
+            contour = contour[1:-1]
 
     if not offset or len(contour) < 2:
         return contour

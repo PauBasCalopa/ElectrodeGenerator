@@ -14,7 +14,10 @@ from datetime import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 from core.profiles import PROFILES, ProfileBase
+from core.validation import InputValidator
 from exporters.dxf_exporter import DXFExporter
+
+_validator = InputValidator()
 
 
 def get_user_input(profile: ProfileBase) -> dict:
@@ -23,13 +26,16 @@ def get_user_input(profile: ProfileBase) -> dict:
     config = {}
     for p in profile.parameters:
         while True:
-            try:
-                raw = input(f"  {p['label']} [default: {p['default']}]: ") or str(p['default'])
-                value = p['type'](raw)
-                config[p['name']] = value
+            raw = input(f"  {p['label']} [default: {p['default']}]: ") or str(p['default'])
+            if p['type'] is int:
+                result = _validator.validate_integer(raw)
+            else:
+                result = _validator.validate_float(raw)
+            if result.is_valid:
+                config[p['name']] = result.value
                 break
-            except ValueError:
-                print(f"  Please enter a valid {p['type'].__name__}.")
+            else:
+                print(f"  {result.error_message}")
     return config
 
 
@@ -45,11 +51,13 @@ def run_cli(args):
 
     # All profiles use s (electrode gap)
     while True:
-        try:
-            config['s'] = float(input("  s (electrode gap) [default: 2.0]: ") or "2.0")
+        raw = input("  s (electrode gap) [default: 2.0]: ") or "2.0"
+        result = _validator.validate_float(raw)
+        if result.is_valid:
+            config['s'] = result.value
             break
-        except ValueError:
-            print("  Please enter a valid number.")
+        else:
+            print(f"  {result.error_message}")
 
     x, y = profile.generate_points(config)
 

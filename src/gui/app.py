@@ -82,7 +82,7 @@ class ProfileGeneratorGUI:
         self.root.config(menu=menubar)
 
         help_menu = tk.Menu(menubar, tearoff=0)
-        help_menu.add_command(label="Equations\u2026", command=self._show_equations)
+        help_menu.add_command(label="User Manual\u2026", command=self._show_manual)
         help_menu.add_separator()
         help_menu.add_command(label="About\u2026", command=self._show_about)
         menubar.add_cascade(label="Help", menu=help_menu)
@@ -292,8 +292,8 @@ class ProfileGeneratorGUI:
         # Draw
         self.ax.clear()
         for cx, cy, label in self._curves:
-            is_plate = "Plate" in label
-            style = (dict(linewidth=3, color='#555555', linestyle='-') if is_plate
+            is_structural = "Plate" in label or "Cap" in label or "Back" in label
+            style = (dict(linewidth=3, color='#555555', linestyle='-') if is_structural
                      else dict(linewidth=2, color='#1f77b4', linestyle='-'))
             self.ax.plot(cx, cy, **style)
 
@@ -392,9 +392,9 @@ class ProfileGeneratorGUI:
                     layer = "PROFILE"
                 else:
                     layer = label.upper().replace(" ", "_").replace("-", "_")
-                is_plate = "Plate" in label
-                color = 7 if is_plate else 5
-                if is_plate or not use_spline:
+                is_structural = "Plate" in label or "Cap" in label or "Back" in label
+                color = 7 if is_structural else 5
+                if is_structural or not use_spline:
                     exporter.add_polyline(points, layer, color)
                 else:
                     exporter.add_spline(points, layer, color)
@@ -538,9 +538,9 @@ class ProfileGeneratorGUI:
     # ------------------------------------------------------------------
     # Help / About dialogs
     # ------------------------------------------------------------------
-    def _show_equations(self):
-        title = f"{self.profile.name} Profile \u2014 Equations"
-        messagebox.showinfo(title, self.profile.equations, parent=self.root)
+    def _show_manual(self):
+        from gui.dialogs.help_dialog import show_help_dialog
+        show_help_dialog(self.root)
 
     def _show_about(self):
         text = (

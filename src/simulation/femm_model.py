@@ -39,10 +39,19 @@ class FEMMBackend(ABC):
     def ei_addsegment(self, x1, y1, x2, y2): ...
 
     @abstractmethod
+    def ei_addarc(self, x1, y1, x2, y2, angle, maxseg): ...
+
+    @abstractmethod
     def ei_selectsegment(self, x, y): ...
 
     @abstractmethod
+    def ei_selectarcsegment(self, x, y): ...
+
+    @abstractmethod
     def ei_setsegmentprop(self, propname, elementsize, automesh, hide, group): ...
+
+    @abstractmethod
+    def ei_setarcsegmentprop(self, propname, elementsize, hide, group): ...
 
     @abstractmethod
     def ei_clearselected(self): ...
@@ -94,11 +103,20 @@ class ComBackend(FEMMBackend):
     def ei_addsegment(self, x1, y1, x2, y2):
         self._femm.ei_addsegment(x1, y1, x2, y2)
 
+    def ei_addarc(self, x1, y1, x2, y2, angle, maxseg):
+        self._femm.ei_addarc(x1, y1, x2, y2, angle, maxseg)
+
     def ei_selectsegment(self, x, y):
         self._femm.ei_selectsegment(x, y)
 
+    def ei_selectarcsegment(self, x, y):
+        self._femm.ei_selectarcsegment(x, y)
+
     def ei_setsegmentprop(self, propname, elementsize, automesh, hide, group):
         self._femm.ei_setsegmentprop(propname, elementsize, automesh, hide, group, "<None>")
+
+    def ei_setarcsegmentprop(self, propname, elementsize, hide, group):
+        self._femm.ei_setarcsegmentprop(propname, elementsize, hide, group, "<None>")
 
     def ei_clearselected(self):
         self._femm.ei_clearselected()
@@ -146,12 +164,23 @@ class LuaBackend(FEMMBackend):
         self.lines.append(
             f"ei_addsegment({x1:.6f}, {y1:.6f}, {x2:.6f}, {y2:.6f})")
 
+    def ei_addarc(self, x1, y1, x2, y2, angle, maxseg):
+        self.lines.append(
+            f"ei_addarc({x1:.6f}, {y1:.6f}, {x2:.6f}, {y2:.6f}, {angle:.2f}, {maxseg})")
+
     def ei_selectsegment(self, x, y):
         self.lines.append(f"ei_selectsegment({x:.6f}, {y:.6f})")
+
+    def ei_selectarcsegment(self, x, y):
+        self.lines.append(f"ei_selectarcsegment({x:.6f}, {y:.6f})")
 
     def ei_setsegmentprop(self, propname, elementsize, automesh, hide, group):
         self.lines.append(
             f'ei_setsegmentprop("{propname}", {elementsize}, {automesh}, {hide}, {group})')
+
+    def ei_setarcsegmentprop(self, propname, elementsize, hide, group):
+        self.lines.append(
+            f'ei_setarcsegmentprop("{propname}", {elementsize}, {hide}, {group})')
 
     def ei_clearselected(self):
         self.lines.append("ei_clearselected()")
@@ -194,7 +223,6 @@ class FEMMModelBuilder:
         self._add_outer_box(curves, config)
         self._add_dielectric(curves, config)
         self._add_electrode_bodies(curves, config)
-        self._add_measurement_contour(curves, config)
         self.backend.ei_zoomnatural()
         self.backend.blank_line()
 
@@ -236,11 +264,11 @@ class FEMMModelBuilder:
             pts = list(zip(cx, cy))
             self.backend.comment(label)
 
-            for x, y in pts:
-                self.backend.ei_addnode(x, y)
-
             boundary = "BotElectrode" if "Bot" in label else "TopElectrode"
             group = 2 if "Bot" in label else 1
+
+            for x, y in pts:
+                self.backend.ei_addnode(x, y)
 
             for i in range(len(pts) - 1):
                 x1, y1 = pts[i]
@@ -354,35 +382,4 @@ class FEMMModelBuilder:
         self.backend.ei_selectlabel(lx, -y_mid)
         self.backend.ei_setblockprop("Dielectric", automesh, mesh, 2)
         self.backend.ei_clearselected()
-        self.backend.blank_line()
-
-    def _add_measurement_contour(self, curves, config):
-        """Draw the E-field measurement contour as visible geometry.
-
-        The contour is placed in group 4 with no boundary properties,
-        so it is visible in the pre-processor without affecting the
-        physics.  It also forces mesh edges along the measurement path,
-        improving field-sampling accuracy.
-        """
-        from core.contour import build_top_contour
-
-        pts = build_top_contour(curves)
-        if len(pts) < 2:
-            return
-
-        mesh = config.get("mesh_size", 0)
-        automesh = 1 if mesh == 0 else 0
-
-        self.backend.comment("E-field measurement contour (group 4)")
-        for x, y in pts:
-            self.backend.ei_addnode(x, y)
-
-        for i in range(len(pts) - 1):
-            x1, y1 = pts[i]
-            x2, y2 = pts[i + 1]
-            self.backend.ei_addsegment(x1, y1, x2, y2)
-            mx, my = (x1 + x2) / 2, (y1 + y2) / 2
-            self.backend.ei_selectsegment(mx, my)
-            self.backend.ei_setsegmentprop("", mesh, automesh, 0, 4)
-            self.backend.ei_clearselected()
         self.backend.blank_line()
