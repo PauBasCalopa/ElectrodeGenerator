@@ -66,7 +66,7 @@ class FEMMExporter:
                 ]
             lines += [
                 "-- Solve",
-                "ei_analyze()",
+                "ei_analyze(1)",
                 "ei_loadsolution()",
                 "",
             ]

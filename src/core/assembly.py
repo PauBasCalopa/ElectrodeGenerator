@@ -7,8 +7,15 @@ Pure geometry functions — no UI or I/O dependencies.
 import math
 
 
-def build_assembly_curves(x, y, gap, plate_length, is_axi=False):
+def build_assembly_curves(x, y, gap, plate_length, is_axi=False,
+                          use_symmetry=False):
     """Build electrode assembly curves from profile points.
+
+    Args:
+        use_symmetry: When True, only the top electrode is generated.
+            The symmetry plane sits at y = 0 (the midplane between the
+            two electrodes).  FEMM applies a fixed-voltage (Dirichlet)
+            boundary there so the bottom electrode is implied.
 
     Returns list of (x_coords, y_coords, label) tuples.
     """
@@ -18,6 +25,10 @@ def build_assembly_curves(x, y, gap, plate_length, is_axi=False):
     d = plate_length
     has_plate = d > 1e-10
 
+    # Subdivide the plate using the same number of points as the
+    # profile so the density follows the "Points" slider directly.
+    n_plate = max(2, len(xn)) if has_plate else 2
+
     curves = []
 
     # Top electrode
@@ -25,29 +36,41 @@ def build_assembly_curves(x, y, gap, plate_length, is_axi=False):
                    [yi + gap / 2 for yi in yn], "Top-Right"))
     if is_axi:
         if has_plate:
-            curves.append(([0, d / 2], [gap / 2, gap / 2], "Top Plate"))
+            px = _subdivide(0, d / 2, n_plate)
+            curves.append((px, [gap / 2] * n_plate, "Top Plate"))
     else:
         curves.append(([-xi - d / 2 for xi in xn],
                        [yi + gap / 2 for yi in yn], "Top-Left"))
         if has_plate:
-            curves.append(([-d / 2, d / 2], [gap / 2, gap / 2], "Top Plate"))
+            px = _subdivide(-d / 2, d / 2, n_plate)
+            curves.append((px, [gap / 2] * n_plate, "Top Plate"))
 
-    # Bottom electrode
-    curves.append(([xi + d / 2 for xi in xn],
-                   [-yi - gap / 2 for yi in yn], "Bot-Right"))
-    if is_axi:
-        if has_plate:
-            curves.append(([0, d / 2], [-gap / 2, -gap / 2], "Bot Plate"))
-    else:
-        curves.append(([-xi - d / 2 for xi in xn],
-                       [-yi - gap / 2 for yi in yn], "Bot-Left"))
-        if has_plate:
-            curves.append(([-d / 2, d / 2], [-gap / 2, -gap / 2], "Bot Plate"))
+    if not use_symmetry:
+        # Bottom electrode
+        curves.append(([xi + d / 2 for xi in xn],
+                       [-yi - gap / 2 for yi in yn], "Bot-Right"))
+        if is_axi:
+            if has_plate:
+                px = _subdivide(0, d / 2, n_plate)
+                curves.append((px, [-gap / 2] * n_plate, "Bot Plate"))
+        else:
+            curves.append(([-xi - d / 2 for xi in xn],
+                           [-yi - gap / 2 for yi in yn], "Bot-Left"))
+            if has_plate:
+                px = _subdivide(-d / 2, d / 2, n_plate)
+                curves.append((px, [-gap / 2] * n_plate, "Bot Plate"))
 
     # Closing caps
-    _add_caps(curves, xn, yn, gap, d, is_axi)
+    _add_caps(curves, xn, yn, gap, d, is_axi, use_symmetry)
 
     return curves
+
+
+def _subdivide(start, end, n):
+    """Return *n* evenly spaced values from *start* to *end* inclusive."""
+    if n < 2:
+        return [start, end]
+    return [start + i * (end - start) / (n - 1) for i in range(n)]
 
 
 # ------------------------------------------------------------------
@@ -126,7 +149,7 @@ def _cap_axi(p_start, tangent, top, num_pts=30):
     return _arc_points(0, yc, R, t0, t1, top, num_pts)
 
 
-def _add_caps(curves, xn, yn, gap, d, is_axi):
+def _add_caps(curves, xn, yn, gap, d, is_axi, use_symmetry=False):
     """Add one closing cap per electrode."""
     if len(xn) < 2:
         return
@@ -139,13 +162,15 @@ def _add_caps(curves, xn, yn, gap, d, is_axi):
     if is_axi:
         xs, ys = _cap_axi((tip_x, tip_y), (tx, ty), top=True)
         curves.append((xs, ys, "Top-Cap"))
-        xs, ys = _cap_axi((tip_x, -tip_y), (tx, -ty), top=False)
-        curves.append((xs, ys, "Bot-Cap"))
+        if not use_symmetry:
+            xs, ys = _cap_axi((tip_x, -tip_y), (tx, -ty), top=False)
+            curves.append((xs, ys, "Bot-Cap"))
     else:
         left_x = -xn[-1] - d / 2
         xs, ys = _cap_planar((tip_x, tip_y), (left_x, tip_y),
                              (tx, ty), top=True)
         curves.append((xs, ys, "Top-Cap"))
-        xs, ys = _cap_planar((tip_x, -tip_y), (left_x, -tip_y),
-                             (tx, -ty), top=False)
-        curves.append((xs, ys, "Bot-Cap"))
+        if not use_symmetry:
+            xs, ys = _cap_planar((tip_x, -tip_y), (left_x, -tip_y),
+                                 (tx, -ty), top=False)
+            curves.append((xs, ys, "Bot-Cap"))

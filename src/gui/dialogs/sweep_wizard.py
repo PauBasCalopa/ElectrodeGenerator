@@ -1,8 +1,8 @@
-﻿"""Optimization wizard dialog.
+"""Parameter sweep wizard dialog.
 
-Presents a UI for configuring and running golden-section parameter
-optimization (single or multi-parameter).  The actual algorithm
-lives in ``core.optimizer``.
+Evaluates field enhancement (ΔE%) at evenly spaced parameter values
+to explore the landscape before optimizing.  The sweep algorithm
+lives in ``core.optimizer.ProfileOptimizer.sweep``.
 """
 
 import threading
@@ -14,9 +14,8 @@ from core.validation import InputValidator
 _validator = InputValidator()
 
 
-def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
-                         on_apply):
-    """Open the optimization wizard dialog.
+def show_sweep_wizard(parent, profile, current_config, gap, plate_length):
+    """Open the parameter-sweep wizard dialog.
 
     Args:
         parent: Parent tk window.
@@ -24,8 +23,6 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
         current_config: Dict of current parameter values.
         gap: Current electrode gap value.
         plate_length: Current plate length value.
-        on_apply: Callback ``on_apply(param_name, value, delta_e)``
-                  called when the user clicks "Apply to Profile".
     """
     # Check FEMM availability before building the dialog
     try:
@@ -35,25 +32,25 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
     except (ImportError, RuntimeError):
         messagebox.showerror(
             "FEMM Not Available",
-            "pyfemm is required for optimization.\n\n"
+            "pyfemm is required for parameter sweeps.\n\n"
             "Install it with:  pip install pyfemm\n"
             "FEMM 4.2 must also be installed on this system.",
             parent=parent)
         return
 
     wiz = tk.Toplevel(parent)
-    wiz.title("Optimize Parameters")
+    wiz.title("Parameter Sweep")
     wiz.resizable(True, True)
     wiz.transient(parent)
     wiz.grab_set()
-    wiz.geometry("560x680")
+    wiz.geometry("560x620")
 
     main_frame = tk.Frame(wiz)
     main_frame.pack(fill=tk.BOTH, expand=True, padx=8, pady=4)
 
     # --- Parameter selection ---
     r = 0
-    tk.Label(main_frame, text="Parameters to optimize",
+    tk.Label(main_frame, text="Parameter to sweep",
              font=("Segoe UI", 11, "bold")).grid(
         row=r, column=0, columnspan=4, sticky=tk.W, pady=(4, 4))
 
@@ -65,28 +62,21 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
     get_selected, _ = build_param_selector(param_frame, profile,
                                             gap=gap, plate_length=plate_length)
 
-    # --- Algorithm settings ---
+    # --- Sweep settings ---
     r += 1
     ttk.Separator(main_frame, orient=tk.HORIZONTAL).grid(
         row=r, column=0, columnspan=4, sticky=tk.EW, pady=4)
     r += 1
-    tk.Label(main_frame, text="Algorithm",
+    tk.Label(main_frame, text="Sweep",
              font=("Segoe UI", 10, "bold")).grid(
         row=r, column=0, columnspan=4, sticky=tk.W, pady=4)
 
     r += 1
-    tk.Label(main_frame, text="Tolerance:").grid(
+    tk.Label(main_frame, text="Number of steps:").grid(
         row=r, column=0, sticky=tk.W, pady=4)
-    tol_entry = tk.Entry(main_frame, width=20)
-    tol_entry.insert(0, "0.001")
-    tol_entry.grid(row=r, column=1, sticky=tk.W, pady=4)
-
-    r += 1
-    tk.Label(main_frame, text="Max iterations:").grid(
-        row=r, column=0, sticky=tk.W, pady=4)
-    maxiter_entry = tk.Entry(main_frame, width=20)
-    maxiter_entry.insert(0, "20")
-    maxiter_entry.grid(row=r, column=1, sticky=tk.W, pady=4)
+    steps_entry = tk.Entry(main_frame, width=20)
+    steps_entry.insert(0, "10")
+    steps_entry.grid(row=r, column=1, sticky=tk.W, pady=4)
 
     # --- Simulation settings ---
     r += 1
@@ -131,12 +121,8 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
     btn_frame = tk.Frame(main_frame)
     btn_frame.grid(row=r, column=0, columnspan=4, pady=8)
 
-    start_btn = tk.Button(btn_frame, text="Start", width=14)
+    start_btn = tk.Button(btn_frame, text="Start Sweep", width=14)
     start_btn.pack(side=tk.LEFT, padx=4)
-
-    apply_btn = tk.Button(btn_frame, text="Apply to Profile",
-                          width=18, state=tk.DISABLED)
-    apply_btn.pack(side=tk.LEFT, padx=4)
 
     def _close():
         cancel_event.set()
@@ -147,7 +133,6 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
     close_btn.pack(side=tk.LEFT, padx=4)
 
     # --- State ---
-    opt_result = {}
     cancel_event = threading.Event()
 
     def _log(msg):
@@ -162,40 +147,34 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
             wiz.after(0, lambda m=args[0]: _log(m))
         elif event == 'progress':
             iteration, pname, val, fef = args
-            msg = (f"  Iter {iteration}: {pname} = {val:.6f}, "
+            msg = (f"  Step {iteration}: {pname} = {val:.6f}, "
                    f"\u0394E = {fef:.2f}%")
             wiz.after(0, lambda m=msg: _log(m))
-        elif event == 'complete':
-            result = args[0]
-            opt_result.update(result)
-            wiz.after(0, lambda: result_label.config(
-                text=f"Optimal {result['param_name']} = "
-                     f"{result['best_value']:.6f}  "
-                     f"(\u0394E = {result['best_delta_e']:.2f}%)"))
-            wiz.after(0, lambda: apply_btn.config(state=tk.NORMAL))
-        elif event == 'multi_complete':
-            result = args[0]
-            opt_result.update(result)
-            vals = result['best_values']
-            vals_str = ", ".join(f"{k}={v:.4f}" for k, v in vals.items())
-            wiz.after(0, lambda: result_label.config(
-                text=f"Optimal: {vals_str}  "
-                     f"(\u0394E = {result['best_delta_e']:.2f}%)"))
-            wiz.after(0, lambda: apply_btn.config(state=tk.NORMAL))
+        elif event == 'sweep_complete':
+            pairs = args[0]
+            if pairs:
+                best = min(pairs, key=lambda p: p[1])
+                wiz.after(0, lambda: result_label.config(
+                    text=f"Best: \u0394E = {best[1]:.2f}% "
+                         f"at value = {best[0]:.6f}"))
 
     # --- Start ---
     def _start():
         selected = get_selected()
         if selected is None:
             return
+        if len(selected) != 1:
+            messagebox.showwarning(
+                "Select one parameter",
+                "Sweep works on exactly one parameter.\n"
+                "Check only one checkbox.",
+                parent=wiz)
+            return
 
         errors = []
-        r_tol = _validator.validate_float(tol_entry.get())
-        if not r_tol:
-            errors.append(f"Tolerance: {r_tol.error_message}")
-        r_iter = _validator.validate_integer(maxiter_entry.get())
-        if not r_iter:
-            errors.append(f"Max iterations: {r_iter.error_message}")
+        r_steps = _validator.validate_integer(steps_entry.get())
+        if not r_steps:
+            errors.append(f"Steps: {r_steps.error_message}")
         if errors:
             messagebox.showwarning("Invalid input",
                                    "\n".join(errors), parent=wiz)
@@ -205,18 +184,16 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
         if femm_config is None:
             return
 
+        p = selected[0]
         cancel_event.clear()
         start_btn.config(text="Cancel",
                          command=lambda: cancel_event.set())
-        apply_btn.config(state=tk.DISABLED)
         progress_text.config(state=tk.NORMAL)
         progress_text.delete("1.0", tk.END)
         progress_text.config(state=tk.DISABLED)
         result_label.config(text="")
-        opt_result.clear()
 
-        tolerance = r_tol.value
-        max_iter = r_iter.value
+        num_steps = r_steps.value
 
         def _run():
             import pythoncom
@@ -225,42 +202,18 @@ def show_optimize_wizard(parent, profile, current_config, gap, plate_length,
                 from core.optimizer import ProfileOptimizer
                 optimizer = ProfileOptimizer(
                     profile, current_config, gap, plate_length, femm_config)
-
-                if len(selected) == 1:
-                    p = selected[0]
-                    optimizer.optimize(
-                        p['name'], (p['min'], p['max']),
-                        tolerance, max_iter,
-                        callback=_on_event,
-                        cancel_flag=cancel_event)
-                else:
-                    names = [p['name'] for p in selected]
-                    bounds = {p['name']: (p['min'], p['max'])
-                              for p in selected}
-                    optimizer.optimize_multi(
-                        names, bounds, tolerance, max_iter,
-                        callback=_on_event,
-                        cancel_flag=cancel_event)
+                optimizer.sweep(
+                    p['name'], (p['min'], p['max']), num_steps,
+                    callback=_on_event,
+                    cancel_flag=cancel_event)
             except Exception as e:
                 err_msg = str(e)
                 wiz.after(0, lambda m=err_msg: _log(f"\nERROR: {m}"))
             finally:
                 pythoncom.CoUninitialize()
                 wiz.after(0, lambda: start_btn.config(
-                    text="Start", command=_start))
+                    text="Start Sweep", command=_start))
 
         threading.Thread(target=_run, daemon=True).start()
 
-    # --- Apply ---
-    def _apply():
-        if opt_result:
-            if 'best_values' in opt_result:
-                for name, val in opt_result['best_values'].items():
-                    on_apply(name, val, opt_result['best_delta_e'])
-            else:
-                on_apply(opt_result['param_name'],
-                         opt_result['best_value'],
-                         opt_result['best_delta_e'])
-
     start_btn.config(command=_start)
-    apply_btn.config(command=_apply)

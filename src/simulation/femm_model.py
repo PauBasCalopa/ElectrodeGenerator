@@ -245,22 +245,35 @@ class FEMMModelBuilder:
         self.backend.blank_line()
 
     def _add_boundaries(self, config):
+        use_sym = config.get("use_symmetry", False)
+        v_top = config.get("voltage_top", 1000)
+        v_bot = config.get("voltage_bottom", 0)
+
         self.backend.comment("Boundary conditions")
-        self.backend.ei_addboundprop(
-            "TopElectrode", config.get("voltage_top", 1000), 0, 0, 0, 0)
-        self.backend.ei_addboundprop(
-            "BotElectrode", config.get("voltage_bottom", 0), 0, 0, 0, 0)
+        self.backend.ei_addboundprop("TopElectrode", v_top, 0, 0, 0, 0)
+        if use_sym:
+            # Anti-symmetry: midplane voltage = average of the two electrodes
+            v_sym = (v_top + v_bot) / 2.0
+            self.backend.ei_addboundprop("Symmetry", v_sym, 0, 0, 0, 0)
+        else:
+            self.backend.ei_addboundprop("BotElectrode", v_bot, 0, 0, 0, 0)
         self.backend.ei_addboundprop("Outer", 0, 0, 0, 0, 1)
         self.backend.blank_line()
 
     def _add_electrodes(self, curves, config):
         is_axi = config.get("problem_type") == "axi"
-        mesh = config.get("mesh_size", 0)
-        automesh = 1 if mesh == 0 else 0
+        use_sym = config.get("use_symmetry", False)
+        emesh = config.get("electrode_mesh_size", 0)
+        e_automesh = 1 if emesh == 0 else 0
 
         self.backend.comment("Electrode geometry")
 
         for cx, cy, label in curves:
+            # In symmetry mode the bottom curves are not generated,
+            # but guard against stray entries anyway.
+            if use_sym and "Bot" in label:
+                continue
+
             pts = list(zip(cx, cy))
             self.backend.comment(label)
 
@@ -281,15 +294,18 @@ class FEMMModelBuilder:
                 if not (is_axi and abs(x1) < 1e-10 and abs(x2) < 1e-10):
                     mx, my = (x1 + x2) / 2, (y1 + y2) / 2
                     self.backend.ei_selectsegment(mx, my)
-                    self.backend.ei_setsegmentprop(boundary, mesh, automesh, 0, group)
+                    self.backend.ei_setsegmentprop(boundary, emesh, e_automesh, 0, group)
                     self.backend.ei_clearselected()
 
         self.backend.blank_line()
 
     def _add_outer_box(self, curves, config):
         is_axi = config.get("problem_type") == "axi"
+        use_sym = config.get("use_symmetry", False)
         mesh = config.get("mesh_size", 0)
         automesh = 1 if mesh == 0 else 0
+        emesh = config.get("electrode_mesh_size", 0)
+        e_automesh = 1 if emesh == 0 else 0
 
         xs = [x for cx, _, _ in curves for x in cx]
         ys = [y for _, cy, _ in curves for y in cy]
@@ -298,7 +314,7 @@ class FEMMModelBuilder:
 
         bx0 = 0 if is_axi else min(xs) - pad
         bx1 = max(xs) + pad
-        by0 = min(ys) - pad
+        by0 = 0.0 if use_sym else min(ys) - pad
         by1 = max(ys) + pad
         corners = [(bx0, by0), (bx1, by0), (bx1, by1), (bx0, by1)]
 
@@ -324,6 +340,19 @@ class FEMMModelBuilder:
                     self.backend.ei_addsegment(
                         0, sorted_ys[j], 0, sorted_ys[j + 1])
                 continue
+
+            # Symmetry boundary along y = 0 edge — use the electrode
+            # mesh size so the gap between plate and symmetry plane
+            # is filled with a fine, graded mesh.
+            if use_sym and abs(y1) < 1e-10 and abs(y2) < 1e-10:
+                self.backend.ei_addsegment(x1, y1, x2, y2)
+                mx = (x1 + x2) / 2
+                self.backend.ei_selectsegment(mx, 0)
+                self.backend.ei_setsegmentprop(
+                    "Symmetry", emesh, e_automesh, 0, 3)
+                self.backend.ei_clearselected()
+                continue
+
             self.backend.ei_addsegment(x1, y1, x2, y2)
             mx, my = (x1 + x2) / 2, (y1 + y2) / 2
             self.backend.ei_selectsegment(mx, my)
@@ -336,15 +365,20 @@ class FEMMModelBuilder:
         mesh = config.get("mesh_size", 0)
         automesh = 1 if mesh == 0 else 0
         is_axi = config.get("problem_type") == "axi"
+        use_sym = config.get("use_symmetry", False)
 
         if is_axi:
             lx = max(x for cx, _, _ in curves for x in cx) * 0.25
         else:
             lx = 0
 
+        # Place the label in the dielectric gap; with symmetry the
+        # domain starts at y = 0 so use a small positive offset.
+        ly = config.get("gap", 1.0) * 0.25 if use_sym else 0
+
         self.backend.comment("Dielectric region")
-        self.backend.ei_addblocklabel(lx, 0)
-        self.backend.ei_selectlabel(lx, 0)
+        self.backend.ei_addblocklabel(lx, ly)
+        self.backend.ei_selectlabel(lx, ly)
         self.backend.ei_setblockprop("Dielectric", automesh, mesh, 0)
         self.backend.ei_clearselected()
         self.backend.blank_line()
@@ -361,6 +395,7 @@ class FEMMModelBuilder:
         if not has_cap:
             return
 
+        use_sym = config.get("use_symmetry", False)
         mesh = config.get("mesh_size", 0)
         automesh = 1 if mesh == 0 else 0
         is_axi = config.get("problem_type") == "axi"
@@ -378,8 +413,9 @@ class FEMMModelBuilder:
         self.backend.ei_setblockprop("Dielectric", automesh, mesh, 1)
         self.backend.ei_clearselected()
 
-        self.backend.ei_addblocklabel(lx, -y_mid)
-        self.backend.ei_selectlabel(lx, -y_mid)
-        self.backend.ei_setblockprop("Dielectric", automesh, mesh, 2)
-        self.backend.ei_clearselected()
+        if not use_sym:
+            self.backend.ei_addblocklabel(lx, -y_mid)
+            self.backend.ei_selectlabel(lx, -y_mid)
+            self.backend.ei_setblockprop("Dielectric", automesh, mesh, 2)
+            self.backend.ei_clearselected()
         self.backend.blank_line()

@@ -154,6 +154,7 @@ class ProfileGeneratorGUI:
         tk.Label(self.left, text="Simulation", font=("Segoe UI", 10, "bold")).pack(anchor=tk.W)
         self.sim_btn = tk.Button(self.left, text="Simulate in FEMM", command=self._simulate_femm, width=22)
         self.sim_btn.pack(pady=2)
+        tk.Button(self.left, text="Sweep\u2026", command=self._show_sweep_wizard, width=22).pack(pady=2)
         tk.Button(self.left, text="Optimize\u2026", command=self._show_optimize_wizard, width=22).pack(pady=2)
 
         # Status bar
@@ -297,15 +298,6 @@ class ProfileGeneratorGUI:
                      else dict(linewidth=2, color='#1f77b4', linestyle='-'))
             self.ax.plot(cx, cy, **style)
 
-        # Draw E-field measurement contour in electrode mode
-        if self.electrode_mode.get() and self._curves:
-            contour_pts = build_top_contour(self._curves)
-            if contour_pts:
-                cx_c = [p[0] for p in contour_pts]
-                cy_c = [p[1] for p in contour_pts]
-                self.ax.plot(cx_c, cy_c, linewidth=1, color='#e74c3c',
-                             linestyle='--', alpha=0.7, label='E-field contour')
-
         self.ax.set_xlabel("X")
         self.ax.set_ylabel("Y")
         self.ax.set_title(f"{self.profile.name} Profile" if not self.electrode_mode.get()
@@ -412,12 +404,16 @@ class ProfileGeneratorGUI:
 
     def _export_femm(self, femm_config):
         is_axi = femm_config.get("problem_type") == "axi"
+        use_sym = femm_config.get("use_symmetry", False)
 
         try:
             config = self._current_config()
             x, y = self.profile.generate_points(config)
+            gap = self.gap.get()
             curves = build_assembly_curves(
-                x, y, self.gap.get(), self.plate_length.get(), is_axi)
+                x, y, gap, self.plate_length.get(), is_axi,
+                use_symmetry=use_sym)
+            femm_config["gap"] = gap
         except Exception as e:
             self.status_var.set(f"Error: {e}")
             return
@@ -466,11 +462,15 @@ class ProfileGeneratorGUI:
     def _run_femm_simulation(self, femm_config):
         """Launch FEMM simulation in a background thread."""
         is_axi = femm_config.get("problem_type") == "axi"
+        use_sym = femm_config.get("use_symmetry", False)
 
         config = self._current_config()
         x, y = self.profile.generate_points(config)
+        gap = self.gap.get()
         curves = build_assembly_curves(
-            x, y, self.gap.get(), self.plate_length.get(), is_axi)
+            x, y, gap, self.plate_length.get(), is_axi,
+            use_symmetry=use_sym)
+        femm_config["gap"] = gap
         contour = build_top_contour(curves)
 
         if self._sim_stop_event is not None:
@@ -507,6 +507,19 @@ class ProfileGeneratorGUI:
                     state=tk.NORMAL, text="Simulate in FEMM"))
 
         threading.Thread(target=_run, daemon=True).start()
+
+    # ------------------------------------------------------------------
+    # Sweep wizard
+    # ------------------------------------------------------------------
+    def _show_sweep_wizard(self):
+        from gui.dialogs.sweep_wizard import show_sweep_wizard
+        show_sweep_wizard(
+            self.root,
+            self.profile,
+            self._current_config(),
+            self.gap.get(),
+            self.plate_length.get(),
+        )
 
     # ------------------------------------------------------------------
     # Optimization wizard

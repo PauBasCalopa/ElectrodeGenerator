@@ -81,6 +81,19 @@ def _build_femm_fields(wiz, include_auto_solve=True):
     mesh_entry.insert(0, "0.0")
     mesh_entry.grid(row=r, column=1, padx=8, pady=4)
 
+    r += 1
+    tk.Label(wiz, text="Electrode mesh size (0 = auto):").grid(
+        row=r, column=0, sticky=tk.W, padx=8, pady=4)
+    emesh_entry = tk.Entry(wiz, width=20)
+    emesh_entry.insert(0, "0.0")
+    emesh_entry.grid(row=r, column=1, padx=8, pady=4)
+
+    r += 1
+    use_symmetry = tk.BooleanVar(value=True)
+    tk.Checkbutton(wiz, text="Use symmetry (model half gap only)",
+                   variable=use_symmetry).grid(
+        row=r, column=0, columnspan=2, sticky=tk.W, padx=8, pady=4)
+
     if include_auto_solve:
         r += 1
         tk.Checkbutton(wiz, text="Auto-solve after generation",
@@ -97,6 +110,7 @@ def _build_femm_fields(wiz, include_auto_solve=True):
             ("Bottom electrode voltage", vbot_entry, {}),
             ("Relative permittivity", epsr_entry, {}),
             ("Mesh size", mesh_entry, {}),
+            ("Electrode mesh size", emesh_entry, {}),
         ]
         values = {}
         for label, entry_w, opts in fields:
@@ -121,6 +135,8 @@ def _build_femm_fields(wiz, include_auto_solve=True):
             "voltage_bottom": values["Bottom electrode voltage"],
             "permittivity": values["Relative permittivity"],
             "mesh_size": values["Mesh size"],
+            "electrode_mesh_size": values["Electrode mesh size"],
+            "use_symmetry": use_symmetry.get(),
         }
         if include_auto_solve:
             cfg["auto_solve"] = auto_solve.get()
