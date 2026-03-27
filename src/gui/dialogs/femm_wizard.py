@@ -18,7 +18,7 @@ def _build_femm_fields(wiz, include_auto_solve=True):
         index after the last field so callers can append their own
         buttons.
     """
-    prob_type = tk.StringVar(value="planar")
+    prob_type = tk.StringVar(value="axi")
     units = tk.StringVar(value="millimeters")
     auto_solve = tk.BooleanVar(value=False)
 

@@ -63,6 +63,8 @@ def build_param_selector(parent, profile, start_row=0, *,
     rows = []  # list of (BooleanVar, name, min_entry, max_entry)
 
     for p in profile.parameters:
+        if p['name'] == 'num_points':
+            continue
         var = tk.BooleanVar(value=False)
         tk.Checkbutton(parent, variable=var).grid(row=r, column=0)
         tk.Label(parent, text=p['label'], anchor=tk.W).grid(

@@ -62,6 +62,7 @@ class ProfileGeneratorGUI:
         self.electrode_mode = tk.BooleanVar(value=False)
         self.gap = tk.DoubleVar(value=1.0)
         self.plate_length = tk.DoubleVar(value=5.0)
+        self.num_points = tk.IntVar(value=100)
 
         # Cached curves for export — always plain Python lists
         self._curves = []  # list of (x_list, y_list, label)
@@ -134,6 +135,18 @@ class ProfileGeneratorGUI:
         plate_entry.insert(0, "5.0")
         self._bind_entry_to_var(plate_entry, self.plate_length, plate_scale)
 
+        tk.Label(self.left, text="Points \u2014 curve resolution", font=("Segoe UI", 9)).pack(anchor=tk.W, pady=(4, 0))
+        pts_row = tk.Frame(self.left)
+        pts_row.pack(fill=tk.X)
+        pts_scale = tk.Scale(pts_row, from_=20, to=500, orient=tk.HORIZONTAL,
+                 variable=self.num_points, resolution=10, showvalue=False,
+                 command=lambda *_: self._schedule_refresh(), length=170)
+        pts_scale.pack(side=tk.LEFT, fill=tk.X, expand=True)
+        pts_entry = tk.Entry(pts_row, width=8, justify=tk.RIGHT)
+        pts_entry.pack(side=tk.RIGHT, padx=(4, 0))
+        pts_entry.insert(0, "100")
+        self._bind_entry_to_var(pts_entry, self.num_points, pts_scale, is_int=True)
+
         tk.Checkbutton(self.left, text="Build electrode assembly",
                        variable=self.electrode_mode, command=self._schedule_refresh).pack(anchor=tk.W, pady=(4, 0))
 
@@ -181,6 +194,8 @@ class ProfileGeneratorGUI:
 
         for p in self.profile.parameters:
             name = p['name']
+            if name == 'num_points':
+                continue  # handled by the fixed Points slider
             tk.Label(self.param_frame_inner, text=p['label'], font=("Segoe UI", 9)).pack(anchor=tk.W, pady=(4, 0))
 
             is_int = (p['type'] is int)
@@ -263,6 +278,7 @@ class ProfileGeneratorGUI:
     def _current_config(self) -> dict:
         config = {name: var.get() for name, var in self.param_widgets.items()}
         config['s'] = self.gap.get()
+        config['num_points'] = self.num_points.get()
         return config
 
     # ------------------------------------------------------------------

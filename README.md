@@ -18,7 +18,8 @@ Parallel plate electrodes need carefully shaped edges to avoid field enhancement
 - **Visualize** the complete electrode assembly (top + bottom electrodes with flat plates and closing arcs)
 - **Export** directly to SolidWorks/AutoCAD (DXF) or FEMM 4.2 (Lua script)
 - **Simulate** electrostatic fields in FEMM without manual model setup (planar and axisymmetric)
-- **Optimize** electrode geometry via built-in golden-section search
+- **Optimize** electrode geometry via golden-section, Differential Evolution, or multi-objective NSGA-II
+- **Sweep** parameter ranges to map ΔE % landscapes
 
 ## Features
 
@@ -32,7 +33,8 @@ Parallel plate electrodes need carefully shaped edges to avoid field enhancement
 | **DXF export wizard** | R12–R2018, Spline or Polyline, layer control |
 | **FEMM Lua wizard** | Complete simulation setup: voltages, εᵣ, mesh, boundary conditions |
 | **FEMM live simulation** | Run FEMM directly from the GUI (requires pyfemm) |
-| **Profile optimizer** | Golden-section search to minimize field non-uniformity (cancellable) |
+| **Profile optimizer** | Three algorithms: Golden-section (1-D), Differential Evolution (global), NSGA-II (multi-objective Pareto) |
+| **Parameter sweep** | Evaluate ΔE % across a parameter range (single or multi-parameter) |
 | **Input validation** | All numerical inputs validated with clear error messages; accepts both `.` and `,` as decimal separator (European format) |
 | **Built-in user manual** | Chapter-based help accessible from the Help menu |
 
@@ -58,7 +60,7 @@ src/
 │   ├── profiles.py          — Rogowski, Chang, Ernst, Bruce generators
 │   ├── assembly.py          — Electrode assembly builder (profiles + plates + arcs)
 │   ├── contour.py           — Measuring contour utilities
-│   ├── optimizer.py         — Golden-section optimizer
+│   ├── optimizer.py         — Optimizer (golden-section, DE, NSGA-II) & sweep
 │   └── validation.py        — Input validation
 ├── exporters/               — File output
 │   ├── csv_exporter.py      — CSV export

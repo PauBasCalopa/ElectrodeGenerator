@@ -90,7 +90,7 @@ class RogowskiProfile(ProfileBase):
         return [
             {'name': 'u_start',    'label': 'u start',                'default': -3.0, 'min': -6.0, 'max': 0.0, 'step': 0.1, 'type': float},
             {'name': 'u_end',      'label': 'u end',                  'default': 2.5,  'min': 0.1,  'max': 5.0, 'step': 0.1, 'type': float},
-            {'name': 'num_points', 'label': 'Points',                 'default': 200,  'min': 20,   'max': 500, 'step': 10,  'type': int},
+            {'name': 'num_points', 'label': 'Points',                 'default': 100,  'min': 20,   'max': 500, 'step': 10,  'type': int},
         ]
 
     def generate_points(self, config: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
@@ -135,7 +135,7 @@ class ChangProfile(ProfileBase):
         return [
             {'name': 'k',          'label': 'k (compactness)',         'default': 0.85, 'min': 0.01, 'max': 2.0, 'step': 0.01, 'type': float},
             {'name': 'u_end',      'label': 'u max (electrode width)', 'default': 2.0,  'min': 0.1,  'max': 5.0, 'step': 0.1,  'type': float},
-            {'name': 'num_points', 'label': 'Points',                  'default': 200,  'min': 20,   'max': 500, 'step': 10,   'type': int},
+            {'name': 'num_points', 'label': 'Points',                  'default': 100,  'min': 20,   'max': 500, 'step': 10,   'type': int},
         ]
 
     def generate_points(self, config: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
@@ -189,7 +189,7 @@ class ErnstProfile(ProfileBase):
         return [
             {'name': 'k0',         'label': 'k\u2080 (shape constant)', 'default': 0.3,   'min': 0.001, 'max': 1.72, 'step': 0.01, 'type': float},
             {'name': 'u_end',      'label': 'u max (electrode width)',  'default': 3.0,   'min': 0.1,  'max': 10.0, 'step': 0.1,  'type': float},
-            {'name': 'num_points', 'label': 'Points',                   'default': 200,   'min': 20,   'max': 500,  'step': 10,   'type': int},
+            {'name': 'num_points', 'label': 'Points',                   'default': 100,   'min': 20,   'max': 500,  'step': 10,   'type': int},
         ]
 
     def generate_points(self, config: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
@@ -263,7 +263,7 @@ class BruceProfile(ProfileBase):
             {'name': 'alpha_0', 'label': '\u03b1\u2080 (characteristic angle \u00b0)',
              'default': 10.0, 'min': 1.0, 'max': 45.0, 'step': 0.5, 'type': float},
             {'name': 'num_points', 'label': 'Points',
-             'default': 200, 'min': 20, 'max': 500, 'step': 10, 'type': int},
+             'default': 100, 'min': 20, 'max': 500, 'step': 10, 'type': int},
         ]
 
     def generate_points(self, config: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
